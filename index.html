@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mahlingo Tiles</title>
+  <title>Synge Street Sentence Mahjong</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
       <div class="brand">
         <div class="logo">🀄</div>
         <div>
-          <h1>Mahlingo Tiles</h1>
+          <h1>Synge Street Sentence Mahjong</h1>
           <p class="sub">Clear the board by building correct sentences from playable tiles</p>
         </div>
       </div>
@@ -24,15 +24,16 @@
             <option value="en">English (EN)</option>
             <option value="es" selected>Spanish (ES)</option>
             <option value="de">German (DE)</option>
+            <option value="fr">French (FR)</option>
           </select>
         </label>
 
         <label class="select">
-          <span>Difficulty</span>
+          <span>Level</span>
           <select id="diffSelect">
-            <option value="easy">Easy</option>
-            <option value="medium" selected>Medium</option>
-            <option value="hard">Hard</option>
+            <option value="easy">Level 1 (Core)</option>
+            <option value="medium" selected>Level 2 (Stretch)</option>
+            <option value="hard">Level 3 (Challenge)</option>
           </select>
         </label>
 
@@ -45,7 +46,7 @@
         <h2>Mode</h2>
         <div class="promptRow">
           <div class="pill" id="modeLabel">Free Play</div>
-          <div id="modeText" class="promptText">Build any correct sentence to remove those tiles.</div>
+          <div id="modeText" class="promptText">Make any correct sentence to remove tiles.</div>
         </div>
 
         <div class="metaRow">
@@ -54,6 +55,8 @@
             <span>Sentences:</span> <strong id="score">0</strong>
             <span class="dot">•</span>
             <span>Tiles left:</span> <strong id="tilesLeft">0</strong>
+            <span class="dot">•</span>
+            <span id="deadlockBadge" class="badge ok">Moves available</span>
           </div>
         </div>
       </section>
@@ -78,7 +81,7 @@
           <div id="board" class="board" aria-label="board"></div>
         </div>
         <div class="boardHint">
-          Playable = nothing on top + at least one side free (left/right). Blocked tiles look faded.
+          Playable = nothing on top + at least one side free. Deadlock means: no valid sentence can be made from playable tiles in sequence.
         </div>
       </section>
     </main>
@@ -92,7 +95,11 @@
         <span class="key k-prep">Prep</span>
         <span class="key k-other">Other</span>
       </div>
-      <div class="tiny">Spanish can drop the subject (“voy…”). English & German typically require it.</div>
+
+      <div class="tagline">
+        <div class="inspire">Synge Street CBS, Dublin — learn bravely, play boldly, build brilliant sentences.</div>
+        <div class="copy">© 2026 Synge Street Sentence Mahjong</div>
+      </div>
     </footer>
   </div>
 
