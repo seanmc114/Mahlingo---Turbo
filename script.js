@@ -1,369 +1,634 @@
-/* Mahlingo Tiles
-  - Languages: EN / ES / DE
-  - Difficulty: Easy / Medium / Hard
-  - Agreement: if pronoun present, it MUST match the verb.
-  - Subject requirement:
-      ES: pronoun optional (verb can carry subject: "voy" = 1sg)
-      EN/DE: pronoun required for these prompts
-  - Feedback explains WHY incorrect
-  - Shuffle button
+/* Mahlingo Tiles — Persistent Mahjong board you CLEAR
+  - EN / ES / DE
+  - Difficulty affects: board size + layers + distractors
+  - Blocking rule:
+      playable if:
+        (1) no tile exists at same (x,y) with z > current z
+        (2) AND (left side free OR right side free) at same z
+  - Prompts are chosen ONLY if solvable from remaining tiles (prevents “ran out of subjects/objects”).
+  - Shuffle = rearrange remaining tiles on the SAME layout slots (no new tiles).
 */
 
 const $ = (id) => document.getElementById(id);
 
-const state = {
-  lang: "es",
-  diff: "medium",         // easy | medium | hard
-  score: 0,
-  currentPrompt: null,
-  sentence: [],
-  tiles: [],
-  tileIdCounter: 1
+const els = {
+  langSelect: $("langSelect"),
+  diffSelect: $("diffSelect"),
+  startBtn: $("startBtn"),
+  shuffleBtn: $("shuffleBtn"),
+  undoBtn: $("undoBtn"),
+  clearBtn: $("clearBtn"),
+  checkBtn: $("checkBtn"),
+  promptText: $("promptText"),
+  promptLabel: $("promptLabel"),
+  ruleHint: $("ruleHint"),
+  score: $("score"),
+  tilesLeft: $("tilesLeft"),
+  sentenceBar: $("sentenceBar"),
+  feedback: $("feedback"),
+  board: $("board"),
 };
 
-// ---------- Core helpers ----------
-function agreeKey(person, number){ return `${person}${number}`; } // e.g., 1sg, 3pl
+const state = {
+  lang: "es",
+  diff: "medium",
+  score: 0,
+  tileId: 1,
+  sentence: [],       // removed tiles waiting in the sentence bar
+  boardTiles: [],     // tiles currently on board
+  slots: [],          // layout slots: {x,y,z}
+  currentPrompt: null
+};
 
-function t(text, pos) {
-  return { id: `t${state.tileIdCounter++}`, text, pos };
-}
-function tPron(text, agrees) {
-  return { id: `t${state.tileIdCounter++}`, text, pos: "pronoun", meta: { agrees } };
-}
-function tVerb(text, agrees) {
-  return { id: `t${state.tileIdCounter++}`, text, pos: "verb", meta: { agrees } };
-}
-function prompt(goal, acceptArrays, diff) {
-  return { goal, accept: acceptArrays, diff }; // diff: easy|medium|hard
-}
-
+// ------------ Language rules ------------
 const LANG = {
-  en: {
-    name: "English",
-    pronounRequired: true,
-    normalize(s){ return s.trim().toLowerCase(); }
-  },
+  en: { name: "English", pronounRequired: true, normalize: s => s.trim().toLowerCase() },
   es: {
     name: "Spanish",
     pronounRequired: false,
-    normalize(s){
-      // capitals ignored; ñ≡n allowed; accents are NOT removed (so accents are required)
-      return s.trim().toLowerCase().replaceAll("ñ", "n");
-    }
+    normalize: s => s.trim().toLowerCase().replaceAll("ñ","n") // allowance ñ≡n
   },
-  de: {
-    name: "German",
-    pronounRequired: true,
-    normalize(s){ return s.trim().toLowerCase(); }
-  }
+  de: { name: "German", pronounRequired: true, normalize: s => s.trim().toLowerCase() }
 };
+const norm = (s) => LANG[state.lang].normalize(s);
 
-// ---------- Dictionaries ----------
+// agreement tag helper
+const ak = (p, n) => `${p}${n}`; // 1sg, 3pl etc.
+
+// tile constructors
+function t(text, pos, meta=null){ return { id:`t${state.tileId++}`, text, pos, meta, x:0, y:0, z:0 }; }
+function tPron(text, agrees){ return t(text, "pronoun", { agrees }); }
+function tVerb(text, agrees){ return t(text, "verb", { agrees }); }
+
+// ------------ Dictionaries ------------
 const PRONOUNS = {
   en: [
-    tPron("I",   [agreeKey(1,"sg")]),
-    tPron("you", [agreeKey(2,"sg"), agreeKey(2,"pl")]),
-    tPron("he",  [agreeKey(3,"sg")]),
-    tPron("she", [agreeKey(3,"sg")]),
-    tPron("we",  [agreeKey(1,"pl")]),
-    tPron("they",[agreeKey(3,"pl")])
+    tPron("I",   [ak(1,"sg")]),
+    tPron("you", [ak(2,"sg"), ak(2,"pl")]),
+    tPron("he",  [ak(3,"sg")]),
+    tPron("she", [ak(3,"sg")]),
+    tPron("we",  [ak(1,"pl")]),
+    tPron("they",[ak(3,"pl")]),
   ],
   es: [
-    tPron("yo", [agreeKey(1,"sg")]),
-    tPron("tú", [agreeKey(2,"sg")]),
-    tPron("él", [agreeKey(3,"sg")]),
-    tPron("ella",[agreeKey(3,"sg")]),
-    tPron("nosotros",[agreeKey(1,"pl")]),
-    tPron("vosotros",[agreeKey(2,"pl")]),
-    tPron("ellos",[agreeKey(3,"pl")]),
-    tPron("ellas",[agreeKey(3,"pl")])
+    tPron("yo",[ak(1,"sg")]),
+    tPron("tú",[ak(2,"sg")]),
+    tPron("él",[ak(3,"sg")]),
+    tPron("ella",[ak(3,"sg")]),
+    tPron("nosotros",[ak(1,"pl")]),
+    tPron("vosotros",[ak(2,"pl")]),
+    tPron("ellos",[ak(3,"pl")]),
+    tPron("ellas",[ak(3,"pl")]),
   ],
   de: [
-    tPron("ich",[agreeKey(1,"sg")]),
-    tPron("du",[agreeKey(2,"sg")]),
-    tPron("er",[agreeKey(3,"sg")]),
-    tPron("sie",[agreeKey(3,"sg")]),     // she
-    tPron("wir",[agreeKey(1,"pl")]),
-    tPron("ihr",[agreeKey(2,"pl")]),
-    tPron("sie",[agreeKey(3,"pl")])      // they
+    tPron("ich",[ak(1,"sg")]),
+    tPron("du",[ak(2,"sg")]),
+    tPron("er",[ak(3,"sg")]),
+    tPron("sie",[ak(3,"sg")]), // she
+    tPron("wir",[ak(1,"pl")]),
+    tPron("ihr",[ak(2,"pl")]),
+    tPron("sie",[ak(3,"pl")]), // they
   ]
 };
 
 const VERBS = {
   en: [
-    // go / goes
-    tVerb("go",   [agreeKey(1,"sg"), agreeKey(2,"sg"), agreeKey(2,"pl"), agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    tVerb("goes", [agreeKey(3,"sg")]),
-    // play / plays
-    tVerb("play",   [agreeKey(1,"sg"), agreeKey(2,"sg"), agreeKey(2,"pl"), agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    tVerb("plays",  [agreeKey(3,"sg")]),
-    // eat / eats
-    tVerb("eat",   [agreeKey(1,"sg"), agreeKey(2,"sg"), agreeKey(2,"pl"), agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    tVerb("eats",  [agreeKey(3,"sg")]),
-    // study / studies
-    tVerb("study",   [agreeKey(1,"sg"), agreeKey(2,"sg"), agreeKey(2,"pl"), agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    tVerb("studies", [agreeKey(3,"sg")]),
-    // have / has
-    tVerb("have", [agreeKey(1,"sg"), agreeKey(2,"sg"), agreeKey(2,"pl"), agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    tVerb("has",  [agreeKey(3,"sg")])
+    tVerb("go",   [ak(1,"sg"),ak(2,"sg"),ak(2,"pl"),ak(1,"pl"),ak(3,"pl")]),
+    tVerb("goes", [ak(3,"sg")]),
+    tVerb("play", [ak(1,"sg"),ak(2,"sg"),ak(2,"pl"),ak(1,"pl"),ak(3,"pl")]),
+    tVerb("plays",[ak(3,"sg")]),
+    tVerb("eat",  [ak(1,"sg"),ak(2,"sg"),ak(2,"pl"),ak(1,"pl"),ak(3,"pl")]),
+    tVerb("eats", [ak(3,"sg")]),
+    tVerb("study",[ak(1,"sg"),ak(2,"sg"),ak(2,"pl"),ak(1,"pl"),ak(3,"pl")]),
+    tVerb("studies",[ak(3,"sg")]),
+    tVerb("have", [ak(1,"sg"),ak(2,"sg"),ak(2,"pl"),ak(1,"pl"),ak(3,"pl")]),
+    tVerb("has",  [ak(3,"sg")]),
   ],
   es: [
-    // ir
-    tVerb("voy",   [agreeKey(1,"sg")]),
-    tVerb("vas",   [agreeKey(2,"sg")]),
-    tVerb("va",    [agreeKey(3,"sg")]),
-    tVerb("vamos", [agreeKey(1,"pl")]),
-    tVerb("vais",  [agreeKey(2,"pl")]),
-    tVerb("van",   [agreeKey(3,"pl")]),
-    // jugar
-    tVerb("juego",   [agreeKey(1,"sg")]),
-    tVerb("juegas",  [agreeKey(2,"sg")]),
-    tVerb("juega",   [agreeKey(3,"sg")]),
-    tVerb("jugamos", [agreeKey(1,"pl")]),
-    tVerb("jugáis",  [agreeKey(2,"pl")]),
-    tVerb("juegan",  [agreeKey(3,"pl")]),
-    // comer
-    tVerb("como",   [agreeKey(1,"sg")]),
-    tVerb("comes",  [agreeKey(2,"sg")]),
-    tVerb("come",   [agreeKey(3,"sg")]),
-    tVerb("comemos",[agreeKey(1,"pl")]),
-    tVerb("coméis", [agreeKey(2,"pl")]),
-    tVerb("comen",  [agreeKey(3,"pl")]),
-    // estudiar
-    tVerb("estudio",    [agreeKey(1,"sg")]),
-    tVerb("estudias",   [agreeKey(2,"sg")]),
-    tVerb("estudia",    [agreeKey(3,"sg")]),
-    tVerb("estudiamos", [agreeKey(1,"pl")]),
-    tVerb("estudiáis",  [agreeKey(2,"pl")]),
-    tVerb("estudian",   [agreeKey(3,"pl")]),
-    // tener
-    tVerb("tengo",   [agreeKey(1,"sg")]),
-    tVerb("tienes",  [agreeKey(2,"sg")]),
-    tVerb("tiene",   [agreeKey(3,"sg")]),
-    tVerb("tenemos", [agreeKey(1,"pl")]),
-    tVerb("tenéis",  [agreeKey(2,"pl")]),
-    tVerb("tienen",  [agreeKey(3,"pl")])
+    tVerb("voy",[ak(1,"sg")]),
+    tVerb("vas",[ak(2,"sg")]),
+    tVerb("va",[ak(3,"sg")]),
+    tVerb("vamos",[ak(1,"pl")]),
+    tVerb("vais",[ak(2,"pl")]),
+    tVerb("van",[ak(3,"pl")]),
+    tVerb("juego",[ak(1,"sg")]),
+    tVerb("juegas",[ak(2,"sg")]),
+    tVerb("juega",[ak(3,"sg")]),
+    tVerb("jugamos",[ak(1,"pl")]),
+    tVerb("jugáis",[ak(2,"pl")]),
+    tVerb("juegan",[ak(3,"pl")]),
+    tVerb("como",[ak(1,"sg")]),
+    tVerb("comes",[ak(2,"sg")]),
+    tVerb("come",[ak(3,"sg")]),
+    tVerb("comemos",[ak(1,"pl")]),
+    tVerb("coméis",[ak(2,"pl")]),
+    tVerb("comen",[ak(3,"pl")]),
+    tVerb("estudio",[ak(1,"sg")]),
+    tVerb("estudias",[ak(2,"sg")]),
+    tVerb("estudia",[ak(3,"sg")]),
+    tVerb("estudiamos",[ak(1,"pl")]),
+    tVerb("estudiáis",[ak(2,"pl")]),
+    tVerb("estudian",[ak(3,"pl")]),
+    tVerb("tengo",[ak(1,"sg")]),
+    tVerb("tienes",[ak(2,"sg")]),
+    tVerb("tiene",[ak(3,"sg")]),
+    tVerb("tenemos",[ak(1,"pl")]),
+    tVerb("tenéis",[ak(2,"pl")]),
+    tVerb("tienen",[ak(3,"pl")]),
   ],
   de: [
-    // gehen
-    tVerb("gehe",  [agreeKey(1,"sg")]),
-    tVerb("gehst", [agreeKey(2,"sg")]),
-    tVerb("geht",  [agreeKey(3,"sg"), agreeKey(2,"pl")]),
-    tVerb("gehen", [agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    // spielen
-    tVerb("spiele",  [agreeKey(1,"sg")]),
-    tVerb("spielst", [agreeKey(2,"sg")]),
-    tVerb("spielt",  [agreeKey(3,"sg"), agreeKey(2,"pl")]),
-    tVerb("spielen", [agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    // essen
-    tVerb("esse",  [agreeKey(1,"sg")]),
-    tVerb("isst",  [agreeKey(2,"sg"), agreeKey(3,"sg")]),
-    tVerb("esst",  [agreeKey(2,"pl")]),
-    tVerb("essen", [agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    // lernen
-    tVerb("lerne",  [agreeKey(1,"sg")]),
-    tVerb("lernst", [agreeKey(2,"sg")]),
-    tVerb("lernt",  [agreeKey(3,"sg"), agreeKey(2,"pl")]),
-    tVerb("lernen", [agreeKey(1,"pl"), agreeKey(3,"pl")]),
-    // haben
-    tVerb("habe",  [agreeKey(1,"sg")]),
-    tVerb("hast",  [agreeKey(2,"sg")]),
-    tVerb("hat",   [agreeKey(3,"sg")]),
-    tVerb("habt",  [agreeKey(2,"pl")]),
-    tVerb("haben", [agreeKey(1,"pl"), agreeKey(3,"pl")])
+    tVerb("gehe",[ak(1,"sg")]),
+    tVerb("gehst",[ak(2,"sg")]),
+    tVerb("geht",[ak(3,"sg"),ak(2,"pl")]),
+    tVerb("gehen",[ak(1,"pl"),ak(3,"pl")]),
+    tVerb("spiele",[ak(1,"sg")]),
+    tVerb("spielst",[ak(2,"sg")]),
+    tVerb("spielt",[ak(3,"sg"),ak(2,"pl")]),
+    tVerb("spielen",[ak(1,"pl"),ak(3,"pl")]),
+    tVerb("esse",[ak(1,"sg")]),
+    tVerb("isst",[ak(2,"sg"),ak(3,"sg")]),
+    tVerb("esst",[ak(2,"pl")]),
+    tVerb("essen",[ak(1,"pl"),ak(3,"pl")]),
+    tVerb("lerne",[ak(1,"sg")]),
+    tVerb("lernst",[ak(2,"sg")]),
+    tVerb("lernt",[ak(3,"sg"),ak(2,"pl")]),
+    tVerb("lernen",[ak(1,"pl"),ak(3,"pl")]),
+    tVerb("habe",[ak(1,"sg")]),
+    tVerb("hast",[ak(2,"sg")]),
+    tVerb("hat",[ak(3,"sg")]),
+    tVerb("habt",[ak(2,"pl")]),
+    tVerb("haben",[ak(1,"pl"),ak(3,"pl")]),
   ]
 };
 
-const OTHER_TILES = {
-  en: [
-    t("to","prep"), t("school","noun"),
-    t("football","noun"),
-    t("an","det"), t("apple","noun"),
-    t("Spanish","noun"),
-    t("homework","noun")
-  ],
-  es: [
-    t("a","prep"), t("la","det"), t("escuela","noun"),
-    t("al","prep"), t("fútbol","noun"),
-    t("una","det"), t("manzana","noun"),
-    t("español","noun"),
-    t("tarea","noun")
-  ],
-  de: [
-    t("zur","prep"), t("schule","noun"),
-    t("fußball","noun"),
-    t("einen","det"), t("apfel","noun"),
-    t("deutsch","noun"),
-    t("hausaufgaben","noun")
-  ]
+const OTHER = {
+  en: [ ["to","prep"],["school","noun"],["football","noun"],["an","det"],["apple","noun"],["Spanish","noun"],["homework","noun"] ]
+    .map(([w,p])=>t(w,p)),
+  es: [ ["a","prep"],["la","det"],["escuela","noun"],["al","prep"],["fútbol","noun"],["una","det"],["manzana","noun"],["español","noun"],["tarea","noun"] ]
+    .map(([w,p])=>t(w,p)),
+  de: [ ["zur","prep"],["schule","noun"],["fußball","noun"],["einen","det"],["apfel","noun"],["deutsch","noun"],["hausaufgaben","noun"] ]
+    .map(([w,p])=>t(w,p))
 };
 
-// ---------- Prompts by language & difficulty ----------
+// Prompts (we’ll only pick ones we can still build from remaining board tiles)
 const PROMPTS = {
   en: [
-    prompt("I go to school", [["I","go","to","school"]], "easy"),
-    prompt("He plays football", [["he","plays","football"]], "easy"),
-    prompt("She eats an apple", [["she","eats","an","apple"]], "medium"),
-    prompt("We study Spanish", [["we","study","Spanish"]], "easy"),
-    prompt("They have homework", [["they","have","homework"]], "medium"),
-    // Hard: extra phrase
-    prompt("He goes to school", [["he","goes","to","school"]], "hard")
+    { goal:"I go to school", accept:[["I","go","to","school"]] },
+    { goal:"He plays football", accept:[["he","plays","football"]] },
+    { goal:"She eats an apple", accept:[["she","eats","an","apple"]] },
+    { goal:"We study Spanish", accept:[["we","study","Spanish"]] },
+    { goal:"They have homework", accept:[["they","have","homework"]] },
+    { goal:"He goes to school", accept:[["he","goes","to","school"]] },
   ],
   es: [
-    // Spanish allows with/without pronoun
-    prompt("I go to school", [["voy","a","la","escuela"], ["yo","voy","a","la","escuela"]], "easy"),
-    prompt("He plays football", [["juega","al","fútbol"], ["él","juega","al","fútbol"]], "easy"),
-    prompt("She eats an apple", [["come","una","manzana"], ["ella","come","una","manzana"]], "medium"),
-    prompt("We study Spanish", [["estudiamos","español"], ["nosotros","estudiamos","español"]], "easy"),
-    prompt("They have homework", [["tienen","tarea"], ["ellos","tienen","tarea"], ["ellas","tienen","tarea"]], "medium"),
-    // Hard: longer
-    prompt("They go to school", [["van","a","la","escuela"], ["ellos","van","a","la","escuela"], ["ellas","van","a","la","escuela"]], "hard")
+    { goal:"I go to school", accept:[["voy","a","la","escuela"],["yo","voy","a","la","escuela"]] },
+    { goal:"He plays football", accept:[["juega","al","fútbol"],["él","juega","al","fútbol"]] },
+    { goal:"She eats an apple", accept:[["come","una","manzana"],["ella","come","una","manzana"]] },
+    { goal:"We study Spanish", accept:[["estudiamos","español"],["nosotros","estudiamos","español"]] },
+    { goal:"They have homework", accept:[["tienen","tarea"],["ellos","tienen","tarea"],["ellas","tienen","tarea"]] },
+    { goal:"They go to school", accept:[["van","a","la","escuela"],["ellos","van","a","la","escuela"],["ellas","van","a","la","escuela"]] },
   ],
   de: [
-    prompt("I go to school", [["ich","gehe","zur","schule"]], "easy"),
-    prompt("He plays football", [["er","spielt","fußball"]], "easy"),
-    prompt("She eats an apple", [["sie","isst","einen","apfel"]], "medium"),
-    prompt("We study German", [["wir","lernen","deutsch"]], "easy"),
-    prompt("They have homework", [["sie","haben","hausaufgaben"]], "medium"),
-    // Hard: longer
-    prompt("We go to school", [["wir","gehen","zur","schule"]], "hard")
+    { goal:"I go to school", accept:[["ich","gehe","zur","schule"]] },
+    { goal:"He plays football", accept:[["er","spielt","fußball"]] },
+    { goal:"She eats an apple", accept:[["sie","isst","einen","apfel"]] },
+    { goal:"We study German", accept:[["wir","lernen","deutsch"]] },
+    { goal:"They have homework", accept:[["sie","haben","hausaufgaben"]] },
+    { goal:"We go to school", accept:[["wir","gehen","zur","schule"]] },
   ]
 };
 
-// Difficulty mapping: which prompts are allowed
-const DIFF_ORDER = { easy: 1, medium: 2, hard: 3 };
+// ------------ Layout templates ------------
+function makeSlots(diff){
+  // x,y are grid coords. We keep it simple but layered.
+  const slots = [];
 
-// How many distractor tiles to add on top of needed tiles
-const DISTRACTORS = {
-  easy: 4,
-  medium: 8,
-  hard: 14
-};
+  // base grid sizes
+  const cfg = diff === "easy"
+    ? { w:6, h:4, layers:1 }
+    : diff === "hard"
+      ? { w:8, h:5, layers:3 }
+      : { w:7, h:5, layers:2 };
 
-// ---------- UI ----------
-const els = {
-  langSelect: $("langSelect"),
-  diffSelect: $("diffSelect"),
-  startBtn: $("startBtn"),
-  promptText: $("promptText"),
-  promptLabel: $("promptLabel"),
-  ruleHint: $("ruleHint"),
-  score: $("score"),
-  tileGrid: $("tileGrid"),
-  sentenceBar: $("sentenceBar"),
-  feedback: $("feedback"),
-  undoBtn: $("undoBtn"),
-  clearBtn: $("clearBtn"),
-  shuffleBtn: $("shuffleBtn"),
-  checkBtn: $("checkBtn")
-};
+  // layer 0: full-ish rectangle with a couple of holes for side freedom
+  for (let y=0; y<cfg.h; y++){
+    for (let x=0; x<cfg.w; x++){
+      // carve a few holes to guarantee side-free tiles
+      const hole = (y===1 && x===0) || (y===cfg.h-2 && x===cfg.w-1);
+      if (!hole) slots.push({x,y,z:0});
+    }
+  }
 
-els.langSelect.addEventListener("change", () => {
-  state.lang = els.langSelect.value;
-  resetGame(true);
-});
-els.diffSelect.addEventListener("change", () => {
-  state.diff = els.diffSelect.value;
-  resetGame(true);
-});
+  // upper layers smaller “islands”
+  if (cfg.layers >= 2){
+    for (let y=1; y<cfg.h-1; y++){
+      for (let x=1; x<cfg.w-1; x++){
+        if ((x+y)%2===0) slots.push({x,y,z:1});
+      }
+    }
+  }
+  if (cfg.layers >= 3){
+    for (let y=2; y<cfg.h-2; y++){
+      for (let x=2; x<cfg.w-2; x++){
+        if ((x+y)%2===0) slots.push({x,y,z:2});
+      }
+    }
+  }
 
-els.startBtn.addEventListener("click", () => resetGame(true));
-els.undoBtn.addEventListener("click", undo);
-els.clearBtn.addEventListener("click", clearSentence);
-els.shuffleBtn.addEventListener("click", shuffleTiles);
-els.checkBtn.addEventListener("click", checkSentence);
+  return slots;
+}
 
-// ---------- Game ----------
-function resetGame(resetScore) {
+// ------------ Board generation (single board to clear) ------------
+function freshBoard(){
+  state.score = 0;
+  state.tileId = 1;
   state.sentence = [];
-  state.tiles = [];
   state.currentPrompt = null;
-  state.tileIdCounter = 1;
-  if (resetScore) state.score = 0;
 
-  nextPrompt();
+  state.slots = makeSlots(state.diff);
+
+  // Decide how many tiles we can place (one per slot)
+  const N = state.slots.length;
+
+  // Build a balanced multiset so we don’t “run out”
+  // (lots of verbs/pronouns + enough nouns/objects)
+  const tiles = [];
+
+  const pron = PRONOUNS[state.lang].map(cloneFresh);
+  const verbs = VERBS[state.lang].map(cloneFresh);
+  const other = OTHER[state.lang].map(cloneFresh);
+
+  // weights by difficulty
+  const mix = state.diff === "easy"
+    ? { pron:0.20, verbs:0.25, other:0.55 }
+    : state.diff === "hard"
+      ? { pron:0.22, verbs:0.28, other:0.50 }
+      : { pron:0.20, verbs:0.27, other:0.53 };
+
+  // start by forcing multiple duplicates of essentials:
+  // - 6 pronouns (or less if language has fewer)
+  // - 10 verbs
+  // - rest other
+  addRandomCopies(tiles, pron, Math.min(8, Math.floor(N*mix.pron)));
+  addRandomCopies(tiles, verbs, Math.min(12, Math.floor(N*mix.verbs)));
+  while (tiles.length < N){
+    // prefer other, but sprinkle extra verbs so you can keep building
+    const pickFrom = (Math.random() < 0.72) ? other : verbs;
+    tiles.push(cloneFresh(pickFrom[Math.floor(Math.random()*pickFrom.length)]));
+  }
+
+  // Place tiles onto slots
+  shuffleInPlace(tiles);
+  state.boardTiles = tiles.slice(0,N).map((ti, i) => {
+    const s = state.slots[i];
+    return { ...ti, x:s.x, y:s.y, z:s.z };
+  });
+
+  // Pick a solvable prompt from this board
+  chooseNextPromptOrEnd();
   renderAll();
-  setFeedback("Ready. Tap tiles to build the sentence.", "neutral");
+  setFeedback("Board created. Clear it by building correct sentences!", "neutral");
 }
 
-function eligiblePrompts() {
-  const list = PROMPTS[state.lang] || [];
-  const max = DIFF_ORDER[state.diff] || 2;
-  return list.filter(p => (DIFF_ORDER[p.diff] || 3) <= max);
+function addRandomCopies(out, sourceArr, count){
+  for (let i=0;i<count;i++){
+    const t0 = sourceArr[Math.floor(Math.random()*sourceArr.length)];
+    out.push(cloneFresh(t0));
+  }
 }
 
-function nextPrompt() {
-  const list = eligiblePrompts();
-  if (!list.length) return;
+function cloneFresh(base){
+  // base tile has id from previous build; ignore it
+  return { ...base, id:`t${state.tileId++}` };
+}
 
-  // random prompt each time
-  state.currentPrompt = list[Math.floor(Math.random() * list.length)];
+// ------------ Prompt selection based on remaining tiles ------------
+function chooseNextPromptOrEnd(){
+  if (state.boardTiles.length === 0){
+    state.currentPrompt = null;
+    els.promptText.textContent = "🎉 Board cleared!";
+    setFeedback("Legend. You cleared the whole board.", "ok");
+    return;
+  }
 
-  // new round: clear sentence + generate tile pool tuned to difficulty
+  const candidates = (PROMPTS[state.lang] || []).filter(p => promptPossibleWithBoard(p));
+  if (candidates.length === 0){
+    state.currentPrompt = null;
+    els.promptText.textContent = "No solvable prompt left";
+    setFeedback(
+      "You’ve hit a dead-end with the remaining tiles.\nUse “Shuffle layout” to rearrange the same tiles, or make a New Board.",
+      "bad"
+    );
+    return;
+  }
+
+  state.currentPrompt = candidates[Math.floor(Math.random()*candidates.length)];
+  updateHints();
+}
+
+function promptPossibleWithBoard(p){
+  // check if ANY accepted sentence can be made from remaining tiles (by counts)
+  const boardWords = state.boardTiles.map(ti => norm(ti.text));
+  const boardCount = countMap(boardWords);
+
+  return p.accept.some(arr => {
+    const needCount = countMap(arr.map(w => norm(w)));
+    for (const [w, c] of Object.entries(needCount)){
+      if ((boardCount[w] || 0) < c) return false;
+    }
+    return true;
+  });
+}
+
+function countMap(arr){
+  const m = {};
+  for (const k of arr) m[k] = (m[k]||0)+1;
+  return m;
+}
+
+// ------------ Mahjong “playable” logic ------------
+function isPlayable(tile){
+  // (1) no tile above at same x,y
+  const hasAbove = state.boardTiles.some(t => t.x===tile.x && t.y===tile.y && t.z>tile.z);
+  if (hasAbove) return false;
+
+  // (2) side freedom: left OR right empty on same z
+  const leftBlocked  = state.boardTiles.some(t => t.z===tile.z && t.y===tile.y && t.x===tile.x-1);
+  const rightBlocked = state.boardTiles.some(t => t.z===tile.z && t.y===tile.y && t.x===tile.x+1);
+  return !(leftBlocked && rightBlocked);
+}
+
+// ------------ Interactions ------------
+function clickTile(tileId){
+  const tile = state.boardTiles.find(t => t.id===tileId);
+  if (!tile) return;
+  if (!isPlayable(tile)) return;
+
+  // remove from board into sentence
+  state.boardTiles = state.boardTiles.filter(t => t.id!==tileId);
+  state.sentence.push(tile);
+
+  renderAll();
+}
+
+function undo(){
+  const last = state.sentence.pop();
+  if (!last) return;
+  state.boardTiles.push(last);
+  renderAll();
+}
+
+function clearSentence(){
+  if (!state.sentence.length) return;
+  state.boardTiles.push(...state.sentence);
   state.sentence = [];
-  state.tiles = buildTilePoolForPrompt(state.currentPrompt);
-  updateRuleHint();
+  renderAll();
 }
 
-function updateRuleHint() {
+function shuffleLayout(){
+  if (state.boardTiles.length === 0) return;
+
+  // Keep same multiset of tiles; just reassign slots
+  const remaining = [...state.boardTiles];
+  const slots = [...state.slots].slice(0, remaining.length);
+
+  // shuffle both and re-place
+  shuffleInPlace(remaining);
+  shuffleInPlace(slots);
+
+  state.boardTiles = remaining.map((ti, i) => ({ ...ti, x: slots[i].x, y: slots[i].y, z: slots[i].z }));
+
+  // prompt might become solvable again
+  if (!state.currentPrompt || !promptPossibleWithBoard(state.currentPrompt)) {
+    chooseNextPromptOrEnd();
+  }
+
+  renderAll();
+  setFeedback("Layout shuffled (same tiles).", "neutral");
+}
+
+// ------------ Sentence checking ------------
+function checkSentence(){
+  if (!state.currentPrompt){
+    setFeedback("No active prompt. Make a New Board or Shuffle.", "bad");
+    return;
+  }
+
+  const built = state.sentence.map(ti => ti.text);
+  const builtNorm = built.map(norm);
+
+  if (builtNorm.length === 0){
+    setFeedback("Build the sentence first.", "bad");
+    return;
+  }
+
+  const verbTile = state.sentence.find(t => t.pos==="verb");
+  if (!verbTile){
+    setFeedback(`Missing a verb.\nExample: ${exampleSentence()}`, "bad");
+    return;
+  }
+
+  const pronTile = state.sentence.find(t => t.pos==="pronoun") || null;
+
+  // EN/DE require pronoun
+  if (LANG[state.lang].pronounRequired && !pronTile){
+    setFeedback(`Missing the subject pronoun.\nExample: ${exampleSentence()}`, "bad");
+    return;
+  }
+
+  // if pronoun present, must agree with verb
+  if (pronTile?.meta?.agrees && verbTile?.meta?.agrees){
+    const ok = pronTile.meta.agrees.some(a => verbTile.meta.agrees.includes(a));
+    if (!ok){
+      setFeedback(
+        `Pronoun/verb mismatch.\nYou used “${pronTile.text}” but “${verbTile.text}” doesn’t match.\nExample: ${exampleSentence()}`,
+        "bad"
+      );
+      return;
+    }
+  }
+
+  // exact match against any accepted sentence
+  const accepted = state.currentPrompt.accept.some(arr => arraysEqual(arr.map(norm), builtNorm));
+  if (!accepted){
+    setFeedback(
+      `Almost — word order/choice is off.\nYour: ${built.join(" ")}\nExample: ${exampleSentence()}`,
+      "bad"
+    );
+    return;
+  }
+
+  // ✅ correct: keep tiles removed (they're already off board)
+  state.score++;
+  state.sentence = [];
+
+  // choose next solvable prompt from remaining tiles
+  chooseNextPromptOrEnd();
+  renderAll();
+
+  if (state.currentPrompt){
+    setFeedback(`✅ Correct. Keep clearing!\nNext: ${state.currentPrompt.goal}`, "ok");
+  } else if (state.boardTiles.length === 0){
+    // already handled
+  } else {
+    // dead-end handled
+  }
+}
+
+// ------------ Rendering ------------
+function renderAll(){
+  els.score.textContent = String(state.score);
+  els.tilesLeft.textContent = String(state.boardTiles.length);
+
+  // prompt
+  if (state.currentPrompt){
+    els.promptText.textContent = state.currentPrompt.goal;
+  }
+
+  renderSentence();
+  renderBoard();
+  updateHints();
+}
+
+function renderSentence(){
+  els.sentenceBar.innerHTML = "";
+  if (!state.sentence.length){
+    const hint = document.createElement("div");
+    hint.style.color = "rgba(0,0,0,.45)";
+    hint.style.fontWeight = "700";
+    hint.textContent = "Tap playable tiles to build the sentence…";
+    els.sentenceBar.appendChild(hint);
+    return;
+  }
+
+  for (const ti of state.sentence){
+    const chip = document.createElement("div");
+    chip.textContent = ti.text;
+    chip.style.padding = "8px 10px";
+    chip.style.borderRadius = "999px";
+    chip.style.border = "1px solid #e5e7eb";
+    chip.style.background = "#fff";
+    chip.style.fontWeight = "900";
+    els.sentenceBar.appendChild(chip);
+  }
+}
+
+function renderBoard(){
+  els.board.innerHTML = "";
+
+  // Set board size based on max x/y in slots so it doesn’t clip
+  const maxX = Math.max(...state.slots.map(s=>s.x), 0);
+  const maxY = Math.max(...state.slots.map(s=>s.y), 0);
+  const approxW = (maxX+1) * (px("--tw") + px("--gap")) + 80;
+  const approxH = (maxY+1) * (px("--th") + px("--gap")) + 80;
+  els.board.style.width = `${approxW}px`;
+  els.board.style.height = `${approxH}px`;
+
+  // render lowest first, highest last
+  const tiles = [...state.boardTiles].sort((a,b)=>a.z-b.z);
+
+  for (const ti of tiles){
+    const div = document.createElement("div");
+    div.className = "tile";
+    div.dataset.pos = ti.pos || "other";
+
+    const playable = isPlayable(ti);
+    div.classList.add(playable ? "playable" : "blocked");
+    if (playable) div.addEventListener("click", ()=>clickTile(ti.id));
+
+    // position
+    const left = ti.x * (px("--tw")+px("--gap")) + ti.z * px("--zdx");
+    const top  = ti.y * (px("--th")+px("--gap")) - ti.z * px("--zdy");
+
+    div.style.left = `${left}px`;
+    div.style.top = `${top}px`;
+    div.style.zIndex = String(10 + ti.z);
+
+    const w = document.createElement("div");
+    w.className = "word";
+    w.textContent = ti.text;
+
+    const p = document.createElement("div");
+    p.className = "pos";
+    p.textContent = prettyPOS(ti.pos);
+
+    div.appendChild(w);
+    div.appendChild(p);
+    els.board.appendChild(div);
+  }
+}
+
+function px(cssVar){
+  // read css variable (e.g. --tw) and return px number
+  const v = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+  if (v.endsWith("px")) return parseFloat(v);
+  // for clamp() etc: browser returns computed px
+  return parseFloat(v) || 70;
+}
+
+function prettyPOS(pos){
+  switch(pos){
+    case "pronoun": return "Pronoun";
+    case "verb": return "Verb";
+    case "det": return "Det";
+    case "noun": return "Noun";
+    case "prep": return "Prep";
+    default: return "Other";
+  }
+}
+
+function updateHints(){
   const L = LANG[state.lang];
   els.promptLabel.textContent = `${L.name} (${state.diff})`;
-  if (state.lang === "es") {
-    els.ruleHint.textContent = "Spanish: pronoun optional (e.g., “voy…”). If you use a pronoun, it MUST match the verb.";
-  } else if (state.lang === "en") {
-    els.ruleHint.textContent = "English: subject is required here. Pronoun must match the verb (he plays / I play).";
+
+  if (state.lang === "es"){
+    els.ruleHint.textContent = "Spanish: pronoun optional (voy = I go). If you use a pronoun, it MUST match the verb.";
+  } else if (state.lang === "en"){
+    els.ruleHint.textContent = "English: pronoun required here. Match: he plays / I play / they play.";
   } else {
-    els.ruleHint.textContent = "German: subject is required here. Pronoun must match the verb (ich gehe / er geht).";
+    els.ruleHint.textContent = "German: pronoun required here. Match: ich gehe / er geht / wir gehen.";
   }
 }
 
-function buildTilePoolForPrompt(p) {
-  // 1) collect needed words for at least one acceptable answer
-  const needWords = wordsNeededForAnyAccept(p.accept);
+function setFeedback(text, kind){
+  els.feedback.textContent = text;
+  els.feedback.classList.remove("ok","bad");
+  if (kind==="ok") els.feedback.classList.add("ok");
+  if (kind==="bad") els.feedback.classList.add("bad");
+}
 
-  // 2) create tiles for needed words (with correct POS/meta if known)
-  const baseTiles = [];
-  const needCounts = countWords(needWords);
+function exampleSentence(){
+  const arr = state.currentPrompt?.accept?.[0] || [];
+  return arr.join(" ");
+}
 
-  for (const [normWord, count] of Object.entries(needCounts)) {
-    for (let i = 0; i < count; i++) baseTiles.push(makeTileForNormWord(normWord));
+function arraysEqual(a,b){
+  if (a.length!==b.length) return false;
+  for (let i=0;i<a.length;i++) if (a[i]!==b[i]) return false;
+  return true;
+}
+
+function shuffleInPlace(arr){
+  for (let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
   }
-
-  // 3) add distractors from the global pool for that language
-  const distractorCount = DISTRACTORS[state.diff] ?? 8;
-  const pool = globalPoolForLang(state.lang);
-
-  // avoid duplicating EXACT same tile text too many times
-  const baseNorms = baseTiles.map(ti => norm(ti.text));
-  const candidates = pool.filter(ti => !baseNorms.includes(norm(ti.text)));
-
-  const shuffled = shuffle([...candidates]);
-  const extras = shuffled.slice(0, Math.min(distractorCount, shuffled.length)).map(cloneTileFreshId);
-
-  // 4) return shuffled combined tiles
-  return shuffle([...baseTiles, ...extras]);
 }
 
-function wordsNeededForAnyAccept(acceptArrays) {
-  // choose shortest accepted sentence so Easy feels easier
-  let best = acceptArrays[0] || [];
-  for (const arr of acceptArrays) if (arr.length < best.length) best = arr;
-  return best;
-}
+// ------------ Wiring ------------
+els.langSelect.addEventListener("change", ()=>{
+  state.lang = els.langSelect.value;
+  freshBoard();
+});
+els.diffSelect.addEventListener("change", ()=>{
+  state.diff = els.diffSelect.value;
+  freshBoard();
+});
+els.startBtn.addEventListener("click", freshBoard);
+els.shuffleBtn.addEventListener("click", shuffleLayout);
+els.undoBtn.addEventListener("click", undo);
+els.clearBtn.addEventListener("click", clearSentence);
+els.checkBtn.addEventListener("click", checkSentence);
 
-function globalPoolForLang(lang) {
-  return [
-    ...PRONOUNS[lang],
-    ...VERBS[lang],
-    ...OTHER_TILES[lang]
-  ];
-}
-
-function cloneTileFreshId(ti) {
-  if (ti.pos === "pronoun") return tPron(ti.text, [...ti.meta.agrees]);
-  if (ti.pos === "verb") return tVerb(ti.text, [...ti.meta.agrees]);
-  return t(ti.text, ti.pos);
-}
-
-function makeTileForNormWord(normWord) {
-  const
+// initial
+freshBoard();
