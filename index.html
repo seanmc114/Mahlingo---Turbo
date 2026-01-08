@@ -3,82 +3,80 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mahlingo Sentence Mahjong</title>
+  <title>Mahlingo Tiles</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="title">Mahlingo</div>
-      <div class="subtitle">Sentence Mahjong</div>
-    </div>
-
-    <div class="controls">
-      <div class="control">
-        <label for="mode">Mode</label>
-        <select id="mode">
-          <option value="EN">English (ESL)</option>
-          <option value="ES">Spanish</option>
-          <option value="DE">German</option>
-        </select>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">🀄</div>
+        <div>
+          <h1>Mahlingo Tiles</h1>
+          <p class="sub">Build correct sentences by tapping tiles</p>
+        </div>
       </div>
 
-      <div class="control">
-        <label for="level">Level</label>
-        <select id="level">
-          <option value="EASY">Easy</option>
-          <option value="MED">Medium</option>
-          <option value="HARD">Hard</option>
-        </select>
+      <div class="controls">
+        <label class="select">
+          <span>Mode</span>
+          <select id="langSelect">
+            <option value="es">Spanish (ES)</option>
+            <option value="de">German (DE)</option>
+          </select>
+        </label>
+
+        <button id="startBtn" class="btn primary">Start / Reset</button>
       </div>
+    </header>
 
-      <button id="newGameBtn" class="btn primary">New Game</button>
-      <button id="hintBtn" class="btn">Hint</button>
-      <button id="undoBtn" class="btn">Undo</button>
-      <button id="clearTrayBtn" class="btn danger">Clear Tray</button>
-    </div>
-  </header>
-
-  <main class="layout">
-    <section class="left">
-      <div class="panel">
-        <div class="panel-title">Build a sentence to clear tiles</div>
-
-        <div class="stats">
-          <div class="stat"><span class="label">Time</span><span id="time">0:00</span></div>
-          <div class="stat"><span class="label">Sentences</span><span id="sentences">0</span></div>
-          <div class="stat"><span class="label">Goal</span><span id="goal">8</span></div>
+    <main class="main">
+      <section class="panel prompt">
+        <h2>Prompt</h2>
+        <div class="promptRow">
+          <div class="pill">English</div>
+          <div id="promptText" class="promptText">Press Start</div>
         </div>
-
-        <div class="template-wrap">
-          <div class="template-title">Template</div>
-          <div id="template" class="template"></div>
-        </div>
-
-        <div class="tray-wrap">
-          <div class="tray-title">Sentence Tray (tap tiles below)</div>
-          <div id="tray" class="tray" aria-label="Sentence tray"></div>
-          <div class="tray-actions">
-            <button id="checkBtn" class="btn primary">Check Sentence</button>
+        <div class="metaRow">
+          <div class="meta" id="ruleHint"></div>
+          <div class="score">
+            <span>Score:</span> <strong id="score">0</strong>
           </div>
-          <div id="message" class="message" role="status" aria-live="polite"></div>
         </div>
-      </div>
+      </section>
 
-      <div class="panel">
-        <div class="panel-title">Colour key</div>
-        <div class="legend" id="legend"></div>
-      </div>
-    </section>
+      <section class="panel build">
+        <h2>Your sentence</h2>
+        <div id="sentenceBar" class="sentenceBar" aria-label="sentence"></div>
 
-    <section class="right">
-      <div class="board-header">
-        <div class="board-title">Board</div>
-        <div class="board-help" id="boardHelp"></div>
+        <div class="actions">
+          <button id="undoBtn" class="btn">Undo</button>
+          <button id="clearBtn" class="btn">Clear</button>
+          <button id="shuffleBtn" class="btn">Shuffle tiles</button>
+          <button id="checkBtn" class="btn success">Check</button>
+        </div>
+
+        <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="panel tiles">
+        <h2>Tiles</h2>
+        <div id="tileGrid" class="tileGrid" aria-label="tiles"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="legend">
+        <span class="key k-pron">Pronoun</span>
+        <span class="key k-verb">Verb</span>
+        <span class="key k-det">Det</span>
+        <span class="key k-noun">Noun</span>
+        <span class="key k-prep">Prep</span>
+        <span class="key k-other">Other</span>
       </div>
-      <div id="board" class="board" aria-label="Tile board"></div>
-    </section>
-  </main>
+      <div class="tiny">Tip: Spanish can drop the subject (“voy…”). German generally cannot (“ich…” needed).</div>
+    </footer>
+  </div>
 
   <script src="script.js"></script>
 </body>
