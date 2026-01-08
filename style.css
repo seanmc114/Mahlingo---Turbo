@@ -12,7 +12,7 @@
   --stepY: 36px;
   --stepZ: 10px;
 
-  --shadow: 0 10px 22px rgba(0,0,0,0.32);
+  --shadow: 0 12px 26px rgba(0,0,0,0.38);
   --shadow2: 0 6px 14px rgba(0,0,0,0.28);
 }
 
@@ -73,13 +73,16 @@ h1{
 
 .layout{
   display:grid;
-  grid-template-columns: 410px 1fr;
+  grid-template-columns: 380px 1fr;
   gap: 16px;
   padding: 16px 18px 18px;
 }
 
+/* Mobile: board first, bigger play area */
 @media (max-width: 980px){
   .layout{ grid-template-columns: 1fr; }
+  .right{ grid-row: 1; }
+  .left{ grid-row: 2; }
 }
 
 .panel{
@@ -105,7 +108,7 @@ h1{
   letter-spacing: 0.2px;
 }
 .panel h3{
-  margin: 10px 0 6px;
+  margin: 10px 0 8px;
   font-size: 13px;
   color: var(--text);
 }
@@ -117,17 +120,18 @@ h1{
   font-size: 13px;
 }
 .rules ul{
-  margin: 8px 0 8px 18px;
+  margin: 8px 0 8px 0;
   padding: 0;
+  list-style: none;
 }
-.rules code{
-  background: rgba(0,0,0,0.28);
-  padding: 2px 6px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.9);
+.rules li{
+  display:flex;
+  align-items:center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
 }
-.note{ margin: 6px 0 0; }
+.note{ margin: 8px 0 0; }
 
 .btn{
   appearance:none;
@@ -168,9 +172,8 @@ h1{
   align-items:stretch;
   overflow:hidden;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.18);
   box-shadow: 0 4px 10px rgba(0,0,0,0.18);
-  background: rgba(255,255,255,0.06);
 }
 .tokenMain{
   padding: 8px 10px;
@@ -179,32 +182,29 @@ h1{
   gap: 2px;
 }
 .tokenWord{
-  font-weight: 800;
+  font-weight: 900;
   font-size: 13px;
   letter-spacing: 0.2px;
-}
-.tokenPos{
-  font-size: 11px;
-  color: rgba(255,255,255,0.74);
+  color: rgba(0,0,0,0.88); /* dark text on solid pastel tokens */
 }
 .tokenBtns{
   display:flex;
   flex-direction: column;
-  border-left: 1px solid rgba(255,255,255,0.12);
+  border-left: 1px solid rgba(255,255,255,0.18);
 }
 .tbtn{
   width: 30px;
   display:grid;
   place-items:center;
   cursor:pointer;
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.20);
   border:0;
-  color: rgba(255,255,255,0.84);
+  color: rgba(0,0,0,0.82);
   font-weight: 900;
 }
-.tbtn:hover{ background: rgba(255,255,255,0.12); }
-.tbtn:active{ background: rgba(255,255,255,0.08); }
-.tbtn + .tbtn{ border-top: 1px solid rgba(255,255,255,0.12); }
+.tbtn:hover{ background: rgba(255,255,255,0.28); }
+.tbtn:active{ background: rgba(255,255,255,0.22); }
+.tbtn + .tbtn{ border-top: 1px solid rgba(255,255,255,0.18); }
 
 .status{
   padding: 10px;
@@ -254,19 +254,36 @@ h1{
   padding: 5px 9px;
   border-radius: 999px;
   font-size: 11px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(0,0,0,0.86);
+  font-weight: 900;
+  letter-spacing: 0.2px;
 }
 
 .board{
   position: relative;
-  width: min(980px, 100%);
-  height: 520px;
+  width: 100%;
+  height: clamp(640px, 76vh, 980px);
   margin: 0 auto;
   border-radius: 18px;
-  background: rgba(0,0,0,0.16);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.24);
+  border: 1px solid rgba(255,255,255,0.12);
   overflow: hidden;
+}
+
+/* Slightly bigger board on phones */
+@media (max-width: 980px){
+  .board{ height: 74vh; }
+}
+
+/* Small phones: slightly smaller tiles so more fits on screen */
+@media (max-width: 520px){
+  :root{
+    --tileW: 78px;
+    --tileH: 54px;
+    --stepX: 46px;
+    --stepY: 32px;
+  }
 }
 
 .tile{
@@ -274,8 +291,7 @@ h1{
   width: var(--tileW);
   height: var(--tileH);
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.26);
   box-shadow: var(--shadow);
   cursor: pointer;
   user-select:none;
@@ -288,35 +304,34 @@ h1{
 }
 .tile:hover{
   transform: translateY(-2px);
-  filter: brightness(1.08);
+  filter: brightness(1.04);
 }
-
 .tile .word{
-  font-weight: 900;
+  font-weight: 1000;
   letter-spacing: 0.2px;
   font-size: 14px;
   line-height: 1.05;
+  color: rgba(0,0,0,0.88); /* dark text on solid pastel tiles */
 }
-.tile .pos{
-  margin-top: 4px;
-  font-size: 11px;
-  color: rgba(255,255,255,0.72);
-  font-weight: 700;
+
+/* Hide POS text everywhere (tiles + tray) */
+.tile .pos,
+.tokenPos{
+  display:none !important;
 }
 
 .tile.free{
-  outline: 2px solid rgba(255,255,255,0.18);
+  outline: 3px solid rgba(255,255,255,0.22);
 }
 .tile.blocked{
-  opacity: 0.55;
+  opacity: 0.65;
   filter: saturate(0.85);
   cursor: not-allowed;
 }
 .tile.selected{
-  outline: 2px solid rgba(33,150,243,0.85);
+  outline: 3px solid rgba(33,150,243,0.92);
   transform: translateY(-3px) scale(1.02);
 }
-
 .tile.removed{
   opacity: 0;
   pointer-events:none;
@@ -338,13 +353,13 @@ h1{
   font-size: 12px;
 }
 
-/* POS coloring */
-.det{ background: rgba(255,193,7,0.18); border-color: rgba(255,193,7,0.34); }
-.noun{ background: rgba(76,175,80,0.16); border-color: rgba(76,175,80,0.34); }
-.verb{ background: rgba(33,150,243,0.18); border-color: rgba(33,150,243,0.36); }
-.adj{ background: rgba(156,39,176,0.16); border-color: rgba(156,39,176,0.34); }
-.pron{ background: rgba(244,67,54,0.16); border-color: rgba(244,67,54,0.34); }
-.prep{ background: rgba(0,188,212,0.16); border-color: rgba(0,188,212,0.34); }
+/* POS coloring (solid pastel; fixes "see-through" distraction) */
+.det{  background: rgba(255,193,7,0.86);  border-color: rgba(255,193,7,0.95); }
+.noun{ background: rgba(76,175,80,0.82);  border-color: rgba(76,175,80,0.92); }
+.verb{ background: rgba(33,150,243,0.84); border-color: rgba(33,150,243,0.94); }
+.adj{  background: rgba(156,39,176,0.78); border-color: rgba(156,39,176,0.92); }
+.pron{ background: rgba(244,67,54,0.76);  border-color: rgba(244,67,54,0.90); }
+.prep{ background: rgba(0,188,212,0.80);  border-color: rgba(0,188,212,0.92); }
 
 /* Tray shake for invalid submissions */
 .shake{
