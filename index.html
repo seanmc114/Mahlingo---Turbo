@@ -38,17 +38,17 @@
         <div id="tray" class="tray" aria-label="Sentence tray"></div>
 
         <div class="rules">
-          <h3>Accepted patterns (simple on purpose)</h3>
+          <h3>Accepted patterns (colour = part of speech)</h3>
           <ul>
-            <li><code>DET + NOUN + VERB</code></li>
-            <li><code>DET + NOUN + VERB + DET + NOUN</code></li>
-            <li><code>PRON + VERB</code></li>
-            <li><code>PRON + VERB + DET + NOUN</code></li>
-            <li><code>PRON + VERB + PREP + DET + NOUN</code></li>
-            <li><code>DET + NOUN + ADJ + VERB</code></li>
-            <li><code>DET + NOUN + VERB + PREP + DET + NOUN</code></li>
+            <li><span class="pill det">DET</span> + <span class="pill noun">NOUN</span> + <span class="pill verb">VERB</span></li>
+            <li><span class="pill det">DET</span> + <span class="pill noun">NOUN</span> + <span class="pill verb">VERB</span> + <span class="pill det">DET</span> + <span class="pill noun">NOUN</span></li>
+            <li><span class="pill pron">PRON</span> + <span class="pill verb">VERB</span></li>
+            <li><span class="pill pron">PRON</span> + <span class="pill verb">VERB</span> + <span class="pill det">DET</span> + <span class="pill noun">NOUN</span></li>
+            <li><span class="pill pron">PRON</span> + <span class="pill verb">VERB</span> + <span class="pill prep">PREP</span> + <span class="pill det">DET</span> + <span class="pill noun">NOUN</span></li>
+            <li><span class="pill det">DET</span> + <span class="pill noun">NOUN</span> + <span class="pill adj">ADJ</span> + <span class="pill verb">VERB</span></li>
+            <li><span class="pill det">DET</span> + <span class="pill noun">NOUN</span> + <span class="pill verb">VERB</span> + <span class="pill prep">PREP</span> + <span class="pill det">DET</span> + <span class="pill noun">NOUN</span></li>
           </ul>
-          <p class="note">This is a “grammar-first” version — we’re not enforcing full agreement yet (but it’s easy to add later).</p>
+          <p class="note">Grammar-first: we’re focusing on sentence structure (agreement rules can be added later).</p>
         </div>
       </div>
 
