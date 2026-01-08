@@ -61,7 +61,6 @@ const ACCEPTED_PATTERNS = [
 ];
 
 // --- Board layout (x,y,z grid units) ---
-// Using a compact “mini turtle” style. x step is 2 units per tile (so side blockers are x±2).
 const LAYOUT = (() => {
   const coords = [];
 
@@ -117,10 +116,8 @@ function newDeal(){
   trayEl.innerHTML = "";
   setStatus("New deal. Tap a free tile to begin.");
 
-  // Build a deck with roughly balanced POS
   const deck = buildDeck(LAYOUT.length);
 
-  // Assign deck -> layout
   tiles = LAYOUT.map((c, i) => {
     const card = deck[i];
     return {
@@ -133,7 +130,6 @@ function newDeal(){
     };
   });
 
-  // Render tiles
   for (const t of tiles){
     const el = document.createElement("button");
     el.className = `tile ${posClass(t.pos)}`;
@@ -141,10 +137,8 @@ function newDeal(){
     el.setAttribute("aria-label", `${t.word} (${t.pos})`);
     el.dataset.id = t.id;
 
-    el.innerHTML = `
-      <div class="word">${escapeHtml(t.word)}</div>
-      <div class="pos">${t.pos}</div>
-    `;
+    // POS text intentionally not rendered (colour is enough)
+    el.innerHTML = `<div class="word">${escapeHtml(t.word)}</div>`;
 
     el.addEventListener("click", () => onTileClick(t.id));
     t.el = el;
@@ -158,7 +152,6 @@ function newDeal(){
 }
 
 function shuffleRemaining(){
-  // Shuffle only the word/POS on tiles that are not removed and not currently in tray
   const inTray = new Set(tray.map(x => x.tileId));
   const remaining = tiles.filter(t => !t.removed && !inTray.has(t.id));
 
@@ -169,8 +162,8 @@ function shuffleRemaining(){
     t.word = deck[idx].w;
     t.pos = deck[idx].tag;
     t.el.querySelector(".word").textContent = t.word;
-    t.el.querySelector(".pos").textContent = t.pos;
     t.el.className = `tile ${posClass(t.pos)}`;
+    t.el.setAttribute("aria-label", `${t.word} (${t.pos})`);
   });
 
   updateFreeStates();
@@ -185,7 +178,6 @@ function hintFreeTiles(){
   }
   for (const t of free){
     t.el.classList.remove("hintPulse");
-    // reflow to restart animation
     void t.el.offsetWidth;
     t.el.classList.add("hintPulse");
   }
@@ -205,7 +197,6 @@ function onTileClick(tileId){
     return;
   }
 
-  // Add to tray
   tray.push({ tileId });
   t.el.classList.add("selected");
   renderTray();
@@ -242,7 +233,9 @@ function submitTray(){
     return;
   }
 
-  const sequence = tray.map(item => tiles.find(t => t.id === item.tileId)?.pos).filter(Boolean);
+  const sequence = tray
+    .map(item => tiles.find(t => t.id === item.tileId)?.pos)
+    .filter(Boolean);
 
   const match = ACCEPTED_PATTERNS.some(p => sameArray(p, sequence));
   if (!match){
@@ -254,7 +247,6 @@ function submitTray(){
     return;
   }
 
-  // Remove tiles used in the tray
   for (const item of tray){
     const t = tiles.find(x => x.id === item.tileId);
     if (!t || t.removed) continue;
@@ -264,10 +256,13 @@ function submitTray(){
   }
 
   sentencesCleared += 1;
-  const sentenceText = tray.map(item => tiles.find(t => t.id === item.tileId)?.word).filter(Boolean).join(" ");
+  const sentenceText = tray
+    .map(item => tiles.find(t => t.id === item.tileId)?.word)
+    .filter(Boolean)
+    .join(" ");
+
   tray = [];
 
-  // Update
   updateFreeStates();
   renderTray();
   renderStats();
@@ -282,7 +277,6 @@ function submitTray(){
 // --------------------------- Rendering ---------------------------
 
 function positionTiles(){
-  // Center-ish placement within board
   const boardRect = boardEl.getBoundingClientRect();
   const css = getComputedStyle(document.documentElement);
   const tileW = px(css.getPropertyValue("--tileW"));
@@ -291,7 +285,6 @@ function positionTiles(){
   const stepY = px(css.getPropertyValue("--stepY"));
   const stepZ = px(css.getPropertyValue("--stepZ"));
 
-  // Determine bounds of layout grid
   const xs = tiles.map(t => t.x);
   const ys = tiles.map(t => t.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -309,7 +302,7 @@ function positionTiles(){
 
     t.el.style.left = `${left}px`;
     t.el.style.top = `${top}px`;
-    t.el.style.zIndex = `${100 + t.z*10 + t.y}`; // stable stacking
+    t.el.style.zIndex = `${100 + t.z*10 + t.y}`;
   }
 }
 
@@ -333,10 +326,10 @@ function renderTray(){
     const token = document.createElement("div");
     token.className = `token ${posClass(t.pos)}`;
 
+    // No POS label; colour does the job
     token.innerHTML = `
       <div class="tokenMain">
         <div class="tokenWord">${escapeHtml(t.word)}</div>
-        <div class="tokenPos">${t.pos}</div>
       </div>
       <div class="tokenBtns">
         <button class="tbtn" title="Move left" aria-label="Move left">◀</button>
@@ -381,7 +374,6 @@ function setStatus(msg){
 // --------------------------- Free-tile logic ---------------------------
 
 function updateFreeStates(){
-  // Clear classes
   for (const t of tiles){
     if (!t.el) continue;
     t.el.classList.remove("free", "blocked");
@@ -397,22 +389,15 @@ function updateFreeStates(){
 }
 
 function getFreeTiles(){
-  // A tile is free if:
-  // 1) Not removed
-  // 2) No tile overlapping above it
-  // 3) At least one open side at same z (no neighbor at x-2 OR x+2 with same y,z, overlapping)
   const remaining = tiles.filter(t => !t.removed);
 
-  // Quick lookup by (x,y,z)
   const key = (x,y,z) => `${x},${y},${z}`;
   const map = new Map();
   for (const t of remaining) map.set(key(t.x,t.y,t.z), t);
 
-  // Helper: overlap check for top tile (simple: any tile at z+1 whose (x,y) is within 1 unit)
   const hasTop = (t) => {
     for (const u of remaining){
       if (u.z <= t.z) continue;
-      // Treat overlap if within 1 grid unit in x and y (because upper layers are offset by 1 in our layout)
       const dx = Math.abs(u.x - t.x);
       const dy = Math.abs(u.y - t.y);
       if (dx <= 1 && dy <= 1) return true;
@@ -438,7 +423,6 @@ function getFreeTiles(){
 // --------------------------- Deck building ---------------------------
 
 function buildDeck(n){
-  // Rough POS weights: DET/NOUN/VERB heavier so patterns are always possible
   const bag = [];
   const addMany = (arr, count) => {
     for (let i=0;i<count;i++){
@@ -447,7 +431,6 @@ function buildDeck(n){
     }
   };
 
-  // Multiply banks into a bag, then sample n from it
   addMany(WORD_BANK.DET, 40);
   addMany(WORD_BANK.NOUN, 40);
   addMany(WORD_BANK.VERB, 34);
@@ -457,8 +440,6 @@ function buildDeck(n){
 
   shuffle(bag);
   const deck = bag.slice(0, n);
-
-  // Final shuffle
   shuffle(deck);
   return deck;
 }
@@ -505,11 +486,9 @@ function escapeHtml(s){
 }
 
 function cryptoId(){
-  // simple, collision-resistant enough for this use
   return (crypto.randomUUID ? crypto.randomUUID() : `id_${Math.random().toString(16).slice(2)}_${Date.now()}`);
 }
 
-// Keep tiles positioned on resize
 window.addEventListener("resize", () => {
   if (!tiles.length) return;
   positionTiles();
