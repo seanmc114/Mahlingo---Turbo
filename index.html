@@ -36,22 +36,22 @@
           </select>
         </label>
 
-        <button id="startBtn" class="btn primary">New Board</button>
+        <button id="newBoardBtn" class="btn primary">New Board</button>
       </div>
     </header>
 
     <main class="main">
       <section class="panel prompt">
-        <h2>Prompt</h2>
+        <h2>Mode</h2>
         <div class="promptRow">
-          <div class="pill" id="promptLabel">Goal</div>
-          <div id="promptText" class="promptText">Press New Board</div>
+          <div class="pill" id="modeLabel">Free Play</div>
+          <div id="modeText" class="promptText">Build any correct sentence to remove those tiles.</div>
         </div>
 
         <div class="metaRow">
           <div class="meta" id="ruleHint"></div>
           <div class="score">
-            <span>Score:</span> <strong id="score">0</strong>
+            <span>Sentences:</span> <strong id="score">0</strong>
             <span class="dot">•</span>
             <span>Tiles left:</span> <strong id="tilesLeft">0</strong>
           </div>
@@ -78,7 +78,7 @@
           <div id="board" class="board" aria-label="board"></div>
         </div>
         <div class="boardHint">
-          A tile is playable if nothing is on top of it and at least one side (left/right) is free.
+          Playable = nothing on top + at least one side free (left/right). Blocked tiles look faded.
         </div>
       </section>
     </main>
