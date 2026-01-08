@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mahjong Sentence Builder (Spanish)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">🀄</div>
+      <div>
+        <h1>Mahjong Sentence Builder</h1>
+        <p class="sub">Tap “free” tiles to build a grammatical Spanish sentence. Submit to remove them.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="btnNew" class="btn">New Deal</button>
+      <button id="btnShuffle" class="btn">Shuffle</button>
+      <button id="btnHint" class="btn">Hint</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="left">
+      <div class="panel">
+        <div class="panelHeader">
+          <h2>Sentence Tray</h2>
+          <div class="trayButtons">
+            <button id="btnUndo" class="btn btnSmall">Undo</button>
+            <button id="btnClear" class="btn btnSmall">Clear</button>
+            <button id="btnSubmit" class="btn btnPrimary btnSmall">Submit</button>
+          </div>
+        </div>
+
+        <div id="tray" class="tray" aria-label="Sentence tray"></div>
+
+        <div class="rules">
+          <h3>Accepted patterns (simple on purpose)</h3>
+          <ul>
+            <li><code>DET + NOUN + VERB</code></li>
+            <li><code>DET + NOUN + VERB + DET + NOUN</code></li>
+            <li><code>PRON + VERB</code></li>
+            <li><code>PRON + VERB + DET + NOUN</code></li>
+            <li><code>PRON + VERB + PREP + DET + NOUN</code></li>
+            <li><code>DET + NOUN + ADJ + VERB</code></li>
+            <li><code>DET + NOUN + VERB + PREP + DET + NOUN</code></li>
+          </ul>
+          <p class="note">This is a “grammar-first” version — we’re not enforcing full agreement yet (but it’s easy to add later).</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Status</h2>
+        <div id="status" class="status">Deal a board and start tapping free tiles.</div>
+        <div class="miniStats">
+          <div><span class="k">Tiles left:</span> <span id="tilesLeft">0</span></div>
+          <div><span class="k">Free tiles:</span> <span id="freeCount">0</span></div>
+          <div><span class="k">Sentences cleared:</span> <span id="sentencesCleared">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="boardWrap">
+        <div class="boardHeader">
+          <h2>Board</h2>
+          <div class="legend">
+            <span class="pill det">DET</span>
+            <span class="pill noun">NOUN</span>
+            <span class="pill verb">VERB</span>
+            <span class="pill adj">ADJ</span>
+            <span class="pill pron">PRON</span>
+            <span class="pill prep">PREP</span>
+          </div>
+        </div>
+
+        <div id="board" class="board" aria-label="Mahjong board"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Tip: a tile is “free” if it has an open left or right side and nothing on top.</span>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
