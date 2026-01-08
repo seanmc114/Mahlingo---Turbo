@@ -1,12 +1,20 @@
-/* Mahlingo Tiles — Persistent Mahjong board you CLEAR
+/* Mahlingo Tiles — Free sentence clearing + Mahjong blocking
   - EN / ES / DE
-  - Difficulty affects: board size + layers + distractors
-  - Blocking rule:
+  - Persistent board: clear it by making ANY valid sentence from playable tiles
+  - Mahjong-ish blocking:
       playable if:
-        (1) no tile exists at same (x,y) with z > current z
-        (2) AND (left side free OR right side free) at same z
-  - Prompts are chosen ONLY if solvable from remaining tiles (prevents “ran out of subjects/objects”).
-  - Shuffle = rearrange remaining tiles on the SAME layout slots (no new tiles).
+        (1) no tile above at same (x,y) with higher z
+        (2) AND at least one side (left/right) free at same z
+  - Grammar checks (kept “hard but not impossible”):
+      * Always requires a VERB
+      * EN/DE: requires a PRONOUN somewhere (typically first)
+      * ES: pronoun optional; BUT if pronoun exists it must agree with verb
+      * If pronoun exists in EN/DE, it must agree with verb too
+      * Basic structure allowed:
+          (Pron)? Verb (NP or PP or both, any number)
+          NP = (Det)? Noun
+          PP = Prep (Det)? Noun
+    This allows loads of “good” sentences without forcing prompts.
 */
 
 const $ = (id) => document.getElementById(id);
@@ -14,13 +22,11 @@ const $ = (id) => document.getElementById(id);
 const els = {
   langSelect: $("langSelect"),
   diffSelect: $("diffSelect"),
-  startBtn: $("startBtn"),
+  newBoardBtn: $("newBoardBtn"),
   shuffleBtn: $("shuffleBtn"),
   undoBtn: $("undoBtn"),
   clearBtn: $("clearBtn"),
   checkBtn: $("checkBtn"),
-  promptText: $("promptText"),
-  promptLabel: $("promptLabel"),
   ruleHint: $("ruleHint"),
   score: $("score"),
   tilesLeft: $("tilesLeft"),
@@ -34,33 +40,27 @@ const state = {
   diff: "medium",
   score: 0,
   tileId: 1,
-  sentence: [],       // removed tiles waiting in the sentence bar
-  boardTiles: [],     // tiles currently on board
-  slots: [],          // layout slots: {x,y,z}
-  currentPrompt: null
+  sentence: [],     // tiles removed from board into current sentence
+  boardTiles: [],   // tiles currently on board
+  slots: [],        // layout slots
 };
 
-// ------------ Language rules ------------
 const LANG = {
   en: { name: "English", pronounRequired: true, normalize: s => s.trim().toLowerCase() },
   es: {
     name: "Spanish",
     pronounRequired: false,
-    normalize: s => s.trim().toLowerCase().replaceAll("ñ","n") // allowance ñ≡n
+    normalize: s => s.trim().toLowerCase().replaceAll("ñ","n") // ñ≡n allowed
   },
   de: { name: "German", pronounRequired: true, normalize: s => s.trim().toLowerCase() }
 };
 const norm = (s) => LANG[state.lang].normalize(s);
+const ak = (p, n) => `${p}${n}`; // 1sg, 3pl
 
-// agreement tag helper
-const ak = (p, n) => `${p}${n}`; // 1sg, 3pl etc.
-
-// tile constructors
 function t(text, pos, meta=null){ return { id:`t${state.tileId++}`, text, pos, meta, x:0, y:0, z:0 }; }
 function tPron(text, agrees){ return t(text, "pronoun", { agrees }); }
 function tVerb(text, agrees){ return t(text, "verb", { agrees }); }
 
-// ------------ Dictionaries ------------
 const PRONOUNS = {
   en: [
     tPron("I",   [ak(1,"sg")]),
@@ -162,64 +162,32 @@ const VERBS = {
 };
 
 const OTHER = {
-  en: [ ["to","prep"],["school","noun"],["football","noun"],["an","det"],["apple","noun"],["Spanish","noun"],["homework","noun"] ]
-    .map(([w,p])=>t(w,p)),
-  es: [ ["a","prep"],["la","det"],["escuela","noun"],["al","prep"],["fútbol","noun"],["una","det"],["manzana","noun"],["español","noun"],["tarea","noun"] ]
-    .map(([w,p])=>t(w,p)),
-  de: [ ["zur","prep"],["schule","noun"],["fußball","noun"],["einen","det"],["apfel","noun"],["deutsch","noun"],["hausaufgaben","noun"] ]
-    .map(([w,p])=>t(w,p))
-};
-
-// Prompts (we’ll only pick ones we can still build from remaining board tiles)
-const PROMPTS = {
   en: [
-    { goal:"I go to school", accept:[["I","go","to","school"]] },
-    { goal:"He plays football", accept:[["he","plays","football"]] },
-    { goal:"She eats an apple", accept:[["she","eats","an","apple"]] },
-    { goal:"We study Spanish", accept:[["we","study","Spanish"]] },
-    { goal:"They have homework", accept:[["they","have","homework"]] },
-    { goal:"He goes to school", accept:[["he","goes","to","school"]] },
-  ],
+    ["to","prep"],["school","noun"],["football","noun"],["an","det"],["apple","noun"],["Spanish","noun"],["homework","noun"],
+  ].map(([w,p])=>t(w,p)),
   es: [
-    { goal:"I go to school", accept:[["voy","a","la","escuela"],["yo","voy","a","la","escuela"]] },
-    { goal:"He plays football", accept:[["juega","al","fútbol"],["él","juega","al","fútbol"]] },
-    { goal:"She eats an apple", accept:[["come","una","manzana"],["ella","come","una","manzana"]] },
-    { goal:"We study Spanish", accept:[["estudiamos","español"],["nosotros","estudiamos","español"]] },
-    { goal:"They have homework", accept:[["tienen","tarea"],["ellos","tienen","tarea"],["ellas","tienen","tarea"]] },
-    { goal:"They go to school", accept:[["van","a","la","escuela"],["ellos","van","a","la","escuela"],["ellas","van","a","la","escuela"]] },
-  ],
+    ["a","prep"],["la","det"],["escuela","noun"],["al","prep"],["fútbol","noun"],["una","det"],["manzana","noun"],["español","noun"],["tarea","noun"],
+  ].map(([w,p])=>t(w,p)),
   de: [
-    { goal:"I go to school", accept:[["ich","gehe","zur","schule"]] },
-    { goal:"He plays football", accept:[["er","spielt","fußball"]] },
-    { goal:"She eats an apple", accept:[["sie","isst","einen","apfel"]] },
-    { goal:"We study German", accept:[["wir","lernen","deutsch"]] },
-    { goal:"They have homework", accept:[["sie","haben","hausaufgaben"]] },
-    { goal:"We go to school", accept:[["wir","gehen","zur","schule"]] },
-  ]
+    ["zur","prep"],["schule","noun"],["fußball","noun"],["einen","det"],["apfel","noun"],["deutsch","noun"],["hausaufgaben","noun"],
+  ].map(([w,p])=>t(w,p))
 };
 
-// ------------ Layout templates ------------
+// ---------- Layout ----------
 function makeSlots(diff){
-  // x,y are grid coords. We keep it simple but layered.
   const slots = [];
-
-  // base grid sizes
   const cfg = diff === "easy"
     ? { w:6, h:4, layers:1 }
     : diff === "hard"
       ? { w:8, h:5, layers:3 }
       : { w:7, h:5, layers:2 };
 
-  // layer 0: full-ish rectangle with a couple of holes for side freedom
   for (let y=0; y<cfg.h; y++){
     for (let x=0; x<cfg.w; x++){
-      // carve a few holes to guarantee side-free tiles
       const hole = (y===1 && x===0) || (y===cfg.h-2 && x===cfg.w-1);
       if (!hole) slots.push({x,y,z:0});
     }
   }
-
-  // upper layers smaller “islands”
   if (cfg.layers >= 2){
     for (let y=1; y<cfg.h-1; y++){
       for (let x=1; x<cfg.w-1; x++){
@@ -234,140 +202,78 @@ function makeSlots(diff){
       }
     }
   }
-
   return slots;
 }
 
-// ------------ Board generation (single board to clear) ------------
+function cloneFresh(base){
+  return { ...base, id:`t${state.tileId++}` };
+}
+
+function shuffleInPlace(arr){
+  for (let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+}
+
 function freshBoard(){
   state.score = 0;
   state.tileId = 1;
   state.sentence = [];
-  state.currentPrompt = null;
 
   state.slots = makeSlots(state.diff);
-
-  // Decide how many tiles we can place (one per slot)
   const N = state.slots.length;
 
-  // Build a balanced multiset so we don’t “run out”
-  // (lots of verbs/pronouns + enough nouns/objects)
   const tiles = [];
-
   const pron = PRONOUNS[state.lang].map(cloneFresh);
   const verbs = VERBS[state.lang].map(cloneFresh);
   const other = OTHER[state.lang].map(cloneFresh);
 
-  // weights by difficulty
-  const mix = state.diff === "easy"
-    ? { pron:0.20, verbs:0.25, other:0.55 }
-    : state.diff === "hard"
-      ? { pron:0.22, verbs:0.28, other:0.50 }
-      : { pron:0.20, verbs:0.27, other:0.53 };
+  // keep it “difficult but not impossible”: load plenty of verbs/nouns
+  const pronTarget = Math.max(6, Math.floor(N * 0.20));
+  const verbTarget = Math.max(10, Math.floor(N * 0.28));
+  addRandomCopies(tiles, pron, pronTarget);
+  addRandomCopies(tiles, verbs, verbTarget);
 
-  // start by forcing multiple duplicates of essentials:
-  // - 6 pronouns (or less if language has fewer)
-  // - 10 verbs
-  // - rest other
-  addRandomCopies(tiles, pron, Math.min(8, Math.floor(N*mix.pron)));
-  addRandomCopies(tiles, verbs, Math.min(12, Math.floor(N*mix.verbs)));
   while (tiles.length < N){
-    // prefer other, but sprinkle extra verbs so you can keep building
-    const pickFrom = (Math.random() < 0.72) ? other : verbs;
+    const pickFrom = (Math.random() < 0.65) ? other : verbs;
     tiles.push(cloneFresh(pickFrom[Math.floor(Math.random()*pickFrom.length)]));
   }
 
-  // Place tiles onto slots
   shuffleInPlace(tiles);
   state.boardTiles = tiles.slice(0,N).map((ti, i) => {
     const s = state.slots[i];
     return { ...ti, x:s.x, y:s.y, z:s.z };
   });
 
-  // Pick a solvable prompt from this board
-  chooseNextPromptOrEnd();
   renderAll();
-  setFeedback("Board created. Clear it by building correct sentences!", "neutral");
-}
-
-function addRandomCopies(out, sourceArr, count){
-  for (let i=0;i<count;i++){
-    const t0 = sourceArr[Math.floor(Math.random()*sourceArr.length)];
-    out.push(cloneFresh(t0));
-  }
-}
-
-function cloneFresh(base){
-  // base tile has id from previous build; ignore it
-  return { ...base, id:`t${state.tileId++}` };
-}
-
-// ------------ Prompt selection based on remaining tiles ------------
-function chooseNextPromptOrEnd(){
-  if (state.boardTiles.length === 0){
-    state.currentPrompt = null;
-    els.promptText.textContent = "🎉 Board cleared!";
-    setFeedback("Legend. You cleared the whole board.", "ok");
-    return;
-  }
-
-  const candidates = (PROMPTS[state.lang] || []).filter(p => promptPossibleWithBoard(p));
-  if (candidates.length === 0){
-    state.currentPrompt = null;
-    els.promptText.textContent = "No solvable prompt left";
-    setFeedback(
-      "You’ve hit a dead-end with the remaining tiles.\nUse “Shuffle layout” to rearrange the same tiles, or make a New Board.",
-      "bad"
-    );
-    return;
-  }
-
-  state.currentPrompt = candidates[Math.floor(Math.random()*candidates.length)];
+  setFeedback("Board created. Make any correct sentence to remove those tiles.", "neutral");
   updateHints();
 }
 
-function promptPossibleWithBoard(p){
-  // check if ANY accepted sentence can be made from remaining tiles (by counts)
-  const boardWords = state.boardTiles.map(ti => norm(ti.text));
-  const boardCount = countMap(boardWords);
-
-  return p.accept.some(arr => {
-    const needCount = countMap(arr.map(w => norm(w)));
-    for (const [w, c] of Object.entries(needCount)){
-      if ((boardCount[w] || 0) < c) return false;
-    }
-    return true;
-  });
+function addRandomCopies(out, src, count){
+  for (let i=0;i<count;i++){
+    out.push(cloneFresh(src[Math.floor(Math.random()*src.length)]));
+  }
 }
 
-function countMap(arr){
-  const m = {};
-  for (const k of arr) m[k] = (m[k]||0)+1;
-  return m;
-}
-
-// ------------ Mahjong “playable” logic ------------
+// ---------- Mahjong playable ----------
 function isPlayable(tile){
-  // (1) no tile above at same x,y
   const hasAbove = state.boardTiles.some(t => t.x===tile.x && t.y===tile.y && t.z>tile.z);
   if (hasAbove) return false;
-
-  // (2) side freedom: left OR right empty on same z
   const leftBlocked  = state.boardTiles.some(t => t.z===tile.z && t.y===tile.y && t.x===tile.x-1);
   const rightBlocked = state.boardTiles.some(t => t.z===tile.z && t.y===tile.y && t.x===tile.x+1);
   return !(leftBlocked && rightBlocked);
 }
 
-// ------------ Interactions ------------
+// ---------- Interactions ----------
 function clickTile(tileId){
   const tile = state.boardTiles.find(t => t.id===tileId);
   if (!tile) return;
   if (!isPlayable(tile)) return;
 
-  // remove from board into sentence
   state.boardTiles = state.boardTiles.filter(t => t.id!==tileId);
   state.sentence.push(tile);
-
   renderAll();
 }
 
@@ -388,106 +294,129 @@ function clearSentence(){
 function shuffleLayout(){
   if (state.boardTiles.length === 0) return;
 
-  // Keep same multiset of tiles; just reassign slots
   const remaining = [...state.boardTiles];
   const slots = [...state.slots].slice(0, remaining.length);
-
-  // shuffle both and re-place
   shuffleInPlace(remaining);
   shuffleInPlace(slots);
 
   state.boardTiles = remaining.map((ti, i) => ({ ...ti, x: slots[i].x, y: slots[i].y, z: slots[i].z }));
-
-  // prompt might become solvable again
-  if (!state.currentPrompt || !promptPossibleWithBoard(state.currentPrompt)) {
-    chooseNextPromptOrEnd();
-  }
-
   renderAll();
   setFeedback("Layout shuffled (same tiles).", "neutral");
 }
 
-// ------------ Sentence checking ------------
+// ---------- Grammar checker (free play) ----------
+function intersects(a, b){
+  const setB = new Set(b);
+  return a.some(x => setB.has(x));
+}
+
 function checkSentence(){
-  if (!state.currentPrompt){
-    setFeedback("No active prompt. Make a New Board or Shuffle.", "bad");
+  if (state.boardTiles.length === 0 && state.sentence.length === 0){
+    setFeedback("Board already cleared. New Board to play again.", "ok");
     return;
   }
 
-  const built = state.sentence.map(ti => ti.text);
-  const builtNorm = built.map(norm);
-
-  if (builtNorm.length === 0){
-    setFeedback("Build the sentence first.", "bad");
+  if (state.sentence.length === 0){
+    setFeedback("Build a sentence first (tap playable tiles).", "bad");
     return;
   }
 
-  const verbTile = state.sentence.find(t => t.pos==="verb");
+  const tiles = state.sentence;
+  const verbTile = tiles.find(t => t.pos === "verb");
   if (!verbTile){
-    setFeedback(`Missing a verb.\nExample: ${exampleSentence()}`, "bad");
+    setFeedback("Missing a verb. A valid sentence must include a verb tile.", "bad");
     return;
   }
 
-  const pronTile = state.sentence.find(t => t.pos==="pronoun") || null;
+  const pronTile = tiles.find(t => t.pos === "pronoun") || null;
 
-  // EN/DE require pronoun
+  // EN/DE require pronoun somewhere
   if (LANG[state.lang].pronounRequired && !pronTile){
-    setFeedback(`Missing the subject pronoun.\nExample: ${exampleSentence()}`, "bad");
+    setFeedback("Missing the subject pronoun (English/German need it here).", "bad");
     return;
   }
 
-  // if pronoun present, must agree with verb
+  // If pronoun exists, must agree with verb
   if (pronTile?.meta?.agrees && verbTile?.meta?.agrees){
-    const ok = pronTile.meta.agrees.some(a => verbTile.meta.agrees.includes(a));
-    if (!ok){
-      setFeedback(
-        `Pronoun/verb mismatch.\nYou used “${pronTile.text}” but “${verbTile.text}” doesn’t match.\nExample: ${exampleSentence()}`,
-        "bad"
-      );
+    if (!intersects(pronTile.meta.agrees, verbTile.meta.agrees)){
+      setFeedback(`Pronoun/verb mismatch: “${pronTile.text}” doesn’t match “${verbTile.text}”.`, "bad");
       return;
     }
   }
 
-  // exact match against any accepted sentence
-  const accepted = state.currentPrompt.accept.some(arr => arraysEqual(arr.map(norm), builtNorm));
-  if (!accepted){
-    setFeedback(
-      `Almost — word order/choice is off.\nYour: ${built.join(" ")}\nExample: ${exampleSentence()}`,
-      "bad"
-    );
+  // Basic structure check (POS-based)
+  const pos = tiles.map(t => t.pos);
+
+  // Find first verb index (we accept pronoun before it; other stuff before verb is rejected to keep it learnable)
+  const vIdx = pos.indexOf("verb");
+  if (vIdx === -1) {
+    setFeedback("Missing a verb.", "bad");
     return;
   }
 
-  // ✅ correct: keep tiles removed (they're already off board)
+  // Before verb: allow only pronouns (and only one, really)
+  for (let i=0;i<vIdx;i++){
+    if (pos[i] !== "pronoun"){
+      setFeedback("In this game, the sentence should start with a subject (or verb in Spanish). Move extra words after the verb.", "bad");
+      return;
+    }
+  }
+
+  // Spanish special: verb can be first; pronoun optional.
+  // For EN/DE: we already required pronoun, but we don’t force it to be first; still strongly preferred.
+  // Now parse after verb as repeating chunks of NP and/or PP:
+  // NP = (det)? noun
+  // PP = prep (det)? noun
+  let i = vIdx + 1;
+
+  function parseNP(){
+    if (pos[i] === "det") i++;
+    if (pos[i] === "noun") { i++; return true; }
+    return false;
+  }
+  function parsePP(){
+    if (pos[i] !== "prep") return false;
+    i++;
+    if (pos[i] === "det") i++;
+    if (pos[i] === "noun") { i++; return true; }
+    return false;
+  }
+
+  // If there are tokens after the verb, they must be parseable as (NP|PP)+
+  while (i < pos.length){
+    if (parsePP()) continue;
+    if (parseNP()) continue;
+    setFeedback("The words after the verb don’t form a clean noun phrase or prepositional phrase (try det+noun or prep+det+noun).", "bad");
+    return;
+  }
+
+  // ✅ valid: keep tiles removed permanently, increment score, clear sentence bar
   state.score++;
   state.sentence = [];
-
-  // choose next solvable prompt from remaining tiles
-  chooseNextPromptOrEnd();
   renderAll();
 
-  if (state.currentPrompt){
-    setFeedback(`✅ Correct. Keep clearing!\nNext: ${state.currentPrompt.goal}`, "ok");
-  } else if (state.boardTiles.length === 0){
-    // already handled
+  if (state.boardTiles.length === 0){
+    setFeedback("🎉 Correct — and the board is cleared!", "ok");
   } else {
-    // dead-end handled
+    setFeedback("✅ Correct sentence! Keep going to clear the board.", "ok");
   }
 }
 
-// ------------ Rendering ------------
-function renderAll(){
-  els.score.textContent = String(state.score);
-  els.tilesLeft.textContent = String(state.boardTiles.length);
-
-  // prompt
-  if (state.currentPrompt){
-    els.promptText.textContent = state.currentPrompt.goal;
+// ---------- Rendering ----------
+function prettyPOS(pos){
+  switch(pos){
+    case "pronoun": return "Pronoun";
+    case "verb": return "Verb";
+    case "det": return "Det";
+    case "noun": return "Noun";
+    case "prep": return "Prep";
+    default: return "Other";
   }
+}
 
-  renderSentence();
-  renderBoard();
-  updateHints();
+function px(cssVar){
+  const v = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+  return parseFloat(v) || 70; // computed clamp becomes px
 }
 
 function renderSentence(){
@@ -496,11 +425,10 @@ function renderSentence(){
     const hint = document.createElement("div");
     hint.style.color = "rgba(0,0,0,.45)";
     hint.style.fontWeight = "700";
-    hint.textContent = "Tap playable tiles to build the sentence…";
+    hint.textContent = "Tap playable tiles to build a sentence…";
     els.sentenceBar.appendChild(hint);
     return;
   }
-
   for (const ti of state.sentence){
     const chip = document.createElement("div");
     chip.textContent = ti.text;
@@ -516,15 +444,13 @@ function renderSentence(){
 function renderBoard(){
   els.board.innerHTML = "";
 
-  // Set board size based on max x/y in slots so it doesn’t clip
   const maxX = Math.max(...state.slots.map(s=>s.x), 0);
   const maxY = Math.max(...state.slots.map(s=>s.y), 0);
-  const approxW = (maxX+1) * (px("--tw") + px("--gap")) + 80;
-  const approxH = (maxY+1) * (px("--th") + px("--gap")) + 80;
+  const approxW = (maxX+1) * (px("--tw") + px("--gap")) + 110;
+  const approxH = (maxY+1) * (px("--th") + px("--gap")) + 110;
   els.board.style.width = `${approxW}px`;
   els.board.style.height = `${approxH}px`;
 
-  // render lowest first, highest last
   const tiles = [...state.boardTiles].sort((a,b)=>a.z-b.z);
 
   for (const ti of tiles){
@@ -536,7 +462,6 @@ function renderBoard(){
     div.classList.add(playable ? "playable" : "blocked");
     if (playable) div.addEventListener("click", ()=>clickTile(ti.id));
 
-    // position
     const left = ti.x * (px("--tw")+px("--gap")) + ti.z * px("--zdx");
     const top  = ti.y * (px("--th")+px("--gap")) - ti.z * px("--zdy");
 
@@ -558,36 +483,22 @@ function renderBoard(){
   }
 }
 
-function px(cssVar){
-  // read css variable (e.g. --tw) and return px number
-  const v = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
-  if (v.endsWith("px")) return parseFloat(v);
-  // for clamp() etc: browser returns computed px
-  return parseFloat(v) || 70;
-}
-
-function prettyPOS(pos){
-  switch(pos){
-    case "pronoun": return "Pronoun";
-    case "verb": return "Verb";
-    case "det": return "Det";
-    case "noun": return "Noun";
-    case "prep": return "Prep";
-    default: return "Other";
-  }
-}
-
 function updateHints(){
-  const L = LANG[state.lang];
-  els.promptLabel.textContent = `${L.name} (${state.diff})`;
-
   if (state.lang === "es"){
     els.ruleHint.textContent = "Spanish: pronoun optional (voy = I go). If you use a pronoun, it MUST match the verb.";
   } else if (state.lang === "en"){
-    els.ruleHint.textContent = "English: pronoun required here. Match: he plays / I play / they play.";
+    els.ruleHint.textContent = "English: pronoun required. Match: he plays / I play / they play.";
   } else {
-    els.ruleHint.textContent = "German: pronoun required here. Match: ich gehe / er geht / wir gehen.";
+    els.ruleHint.textContent = "German: pronoun required. Match: ich gehe / er geht / wir gehen.";
   }
+}
+
+function renderAll(){
+  els.score.textContent = String(state.score);
+  els.tilesLeft.textContent = String(state.boardTiles.length);
+  renderSentence();
+  renderBoard();
+  updateHints();
 }
 
 function setFeedback(text, kind){
@@ -597,25 +508,7 @@ function setFeedback(text, kind){
   if (kind==="bad") els.feedback.classList.add("bad");
 }
 
-function exampleSentence(){
-  const arr = state.currentPrompt?.accept?.[0] || [];
-  return arr.join(" ");
-}
-
-function arraysEqual(a,b){
-  if (a.length!==b.length) return false;
-  for (let i=0;i<a.length;i++) if (a[i]!==b[i]) return false;
-  return true;
-}
-
-function shuffleInPlace(arr){
-  for (let i=arr.length-1;i>0;i--){
-    const j = Math.floor(Math.random()*(i+1));
-    [arr[i],arr[j]]=[arr[j],arr[i]];
-  }
-}
-
-// ------------ Wiring ------------
+// ---------- Wiring ----------
 els.langSelect.addEventListener("change", ()=>{
   state.lang = els.langSelect.value;
   freshBoard();
@@ -624,11 +517,11 @@ els.diffSelect.addEventListener("change", ()=>{
   state.diff = els.diffSelect.value;
   freshBoard();
 });
-els.startBtn.addEventListener("click", freshBoard);
+els.newBoardBtn.addEventListener("click", freshBoard);
 els.shuffleBtn.addEventListener("click", shuffleLayout);
 els.undoBtn.addEventListener("click", undo);
 els.clearBtn.addEventListener("click", clearSentence);
 els.checkBtn.addEventListener("click", checkSentence);
 
-// initial
+// start
 freshBoard();
