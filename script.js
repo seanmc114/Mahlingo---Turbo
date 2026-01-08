@@ -18,7 +18,7 @@ const btnUndo = document.getElementById("btnUndo");
 const btnClear = document.getElementById("btnClear");
 const btnSubmit = document.getElementById("btnSubmit");
 
-// --- POS datasets (small but fun; expand as you like) ---
+// --- POS datasets ---
 const WORD_BANK = {
   DET: [
     { w: "el", tag: "DET" }, { w: "la", tag: "DET" }, { w: "los", tag: "DET" }, { w: "las", tag: "DET" },
@@ -49,7 +49,7 @@ const WORD_BANK = {
   ],
 };
 
-// --- Accepted POS patterns (keep it “grammar-first”, not agreement-first) ---
+// --- Accepted POS patterns ---
 const ACCEPTED_PATTERNS = [
   ["DET","NOUN","VERB"],
   ["DET","NOUN","VERB","DET","NOUN"],
@@ -64,36 +64,32 @@ const ACCEPTED_PATTERNS = [
 const LAYOUT = (() => {
   const coords = [];
 
-  // Base layer: 8x4 block
   for (let y = 0; y < 4; y++){
     for (let x = 0; x < 8; x++){
       coords.push({ x: x*2, y: y*2, z: 0 });
     }
   }
 
-  // Mid layer: 6x3 centered
   for (let y = 0; y < 3; y++){
     for (let x = 0; x < 6; x++){
       coords.push({ x: (x*2)+1, y: (y*2)+1, z: 1 });
     }
   }
 
-  // Top layer: 4x2 centered
   for (let y = 0; y < 2; y++){
     for (let x = 0; x < 4; x++){
       coords.push({ x: (x*2)+2, y: (y*2)+2, z: 2 });
     }
   }
 
-  // Crown: 2 tiles
   coords.push({ x: 5, y: 3, z: 3 });
   coords.push({ x: 6, y: 3, z: 3 });
 
   return coords;
 })();
 
-let tiles = [];      // {id, x,y,z, word, pos, removed:false, el}
-let tray = [];       // {tileId}
+let tiles = [];
+let tray = [];
 let sentencesCleared = 0;
 
 btnNew.addEventListener("click", newDeal);
@@ -104,8 +100,6 @@ btnClear.addEventListener("click", clearTray);
 btnSubmit.addEventListener("click", submitTray);
 
 newDeal();
-
-// --------------------------- Core ---------------------------
 
 function newDeal(){
   sentencesCleared = 0;
@@ -137,10 +131,9 @@ function newDeal(){
     el.setAttribute("aria-label", `${t.word} (${t.pos})`);
     el.dataset.id = t.id;
 
-    // POS text intentionally not rendered (colour is enough)
     el.innerHTML = `<div class="word">${escapeHtml(t.word)}</div>`;
-
     el.addEventListener("click", () => onTileClick(t.id));
+
     t.el = el;
     boardEl.appendChild(el);
   }
@@ -233,11 +226,9 @@ function submitTray(){
     return;
   }
 
-  const sequence = tray
-    .map(item => tiles.find(t => t.id === item.tileId)?.pos)
-    .filter(Boolean);
-
+  const sequence = tray.map(item => tiles.find(t => t.id === item.tileId)?.pos).filter(Boolean);
   const match = ACCEPTED_PATTERNS.some(p => sameArray(p, sequence));
+
   if (!match){
     setStatus(`Not a valid pattern: ${sequence.join(" + ")}. Try one of the listed patterns.`);
     trayEl.classList.remove("shake");
@@ -256,11 +247,7 @@ function submitTray(){
   }
 
   sentencesCleared += 1;
-  const sentenceText = tray
-    .map(item => tiles.find(t => t.id === item.tileId)?.word)
-    .filter(Boolean)
-    .join(" ");
-
+  const sentenceText = tray.map(item => tiles.find(t => t.id === item.tileId)?.word).filter(Boolean).join(" ");
   tray = [];
 
   updateFreeStates();
@@ -273,8 +260,6 @@ function submitTray(){
     setStatus(`✅ Sentence cleared: “${sentenceText}”. Nice — keep going.`);
   }
 }
-
-// --------------------------- Rendering ---------------------------
 
 function positionTiles(){
   const boardRect = boardEl.getBoundingClientRect();
@@ -311,7 +296,6 @@ function renderTray(){
 
   if (tray.length === 0){
     const empty = document.createElement("div");
-    empty.className = "muted";
     empty.style.color = "rgba(255,255,255,0.62)";
     empty.style.fontSize = "13px";
     empty.textContent = "Tray empty. Tap free tiles on the board.";
@@ -326,7 +310,6 @@ function renderTray(){
     const token = document.createElement("div");
     token.className = `token ${posClass(t.pos)}`;
 
-    // No POS label; colour does the job
     token.innerHTML = `
       <div class="tokenMain">
         <div class="tokenWord">${escapeHtml(t.word)}</div>
@@ -341,17 +324,13 @@ function renderTray(){
 
     leftBtn.addEventListener("click", () => {
       if (idx === 0) return;
-      const tmp = tray[idx-1];
-      tray[idx-1] = tray[idx];
-      tray[idx] = tmp;
+      [tray[idx-1], tray[idx]] = [tray[idx], tray[idx-1]];
       renderTray();
     });
 
     rightBtn.addEventListener("click", () => {
       if (idx === tray.length - 1) return;
-      const tmp = tray[idx+1];
-      tray[idx+1] = tray[idx];
-      tray[idx] = tmp;
+      [tray[idx+1], tray[idx]] = [tray[idx], tray[idx+1]];
       renderTray();
     });
 
@@ -360,18 +339,12 @@ function renderTray(){
 }
 
 function renderStats(){
-  const left = tiles.filter(t => !t.removed).length;
-  const free = getFreeTiles().length;
-  tilesLeftEl.textContent = String(left);
-  freeCountEl.textContent = String(free);
+  tilesLeftEl.textContent = String(tiles.filter(t => !t.removed).length);
+  freeCountEl.textContent = String(getFreeTiles().length);
   sentencesClearedEl.textContent = String(sentencesCleared);
 }
 
-function setStatus(msg){
-  statusEl.textContent = msg;
-}
-
-// --------------------------- Free-tile logic ---------------------------
+function setStatus(msg){ statusEl.textContent = msg; }
 
 function updateFreeStates(){
   for (const t of tiles){
@@ -412,15 +385,10 @@ function getFreeTiles(){
     const leftNeighbor = map.get(key(t.x - 2, t.y, t.z));
     const rightNeighbor = map.get(key(t.x + 2, t.y, t.z));
 
-    const openLeft = !leftNeighbor;
-    const openRight = !rightNeighbor;
-
-    if (openLeft || openRight) free.push(t);
+    if (!leftNeighbor || !rightNeighbor) free.push(t);
   }
   return free;
 }
-
-// --------------------------- Deck building ---------------------------
 
 function buildDeck(n){
   const bag = [];
@@ -443,8 +411,6 @@ function buildDeck(n){
   shuffle(deck);
   return deck;
 }
-
-// --------------------------- Utils ---------------------------
 
 function shuffle(arr){
   for (let i = arr.length - 1; i > 0; i--){
@@ -472,9 +438,7 @@ function posClass(pos){
   }
 }
 
-function px(v){
-  return Number(String(v).replace("px","").trim()) || 0;
-}
+function px(v){ return Number(String(v).replace("px","").trim()) || 0; }
 
 function escapeHtml(s){
   return String(s)
