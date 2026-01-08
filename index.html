@@ -19,10 +19,20 @@
 
       <div class="controls">
         <label class="select">
-          <span>Mode</span>
+          <span>Language</span>
           <select id="langSelect">
-            <option value="es">Spanish (ES)</option>
+            <option value="en">English (EN)</option>
+            <option value="es" selected>Spanish (ES)</option>
             <option value="de">German (DE)</option>
+          </select>
+        </label>
+
+        <label class="select">
+          <span>Difficulty</span>
+          <select id="diffSelect">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
           </select>
         </label>
 
@@ -34,7 +44,7 @@
       <section class="panel prompt">
         <h2>Prompt</h2>
         <div class="promptRow">
-          <div class="pill">English</div>
+          <div class="pill" id="promptLabel">Goal</div>
           <div id="promptText" class="promptText">Press Start</div>
         </div>
         <div class="metaRow">
@@ -74,7 +84,7 @@
         <span class="key k-prep">Prep</span>
         <span class="key k-other">Other</span>
       </div>
-      <div class="tiny">Tip: Spanish can drop the subject (“voy…”). German generally cannot (“ich…” needed).</div>
+      <div class="tiny">Tip: Spanish can drop the subject (“voy…”). English & German usually can’t.</div>
     </footer>
   </div>
 
