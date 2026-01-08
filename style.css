@@ -14,6 +14,12 @@
   --other:#f3f4f6;
 
   --shadow: 0 10px 30px rgba(0,0,0,.08);
+
+  --tw: clamp(62px, 9.5vw, 78px);
+  --th: clamp(58px, 8.5vw, 70px);
+  --gap: 10px;
+  --zdx: 7px;
+  --zdy: 6px;
 }
 
 *{box-sizing:border-box}
@@ -56,8 +62,8 @@ select{
   box-shadow: var(--shadow); cursor:pointer; font-weight:650;
 }
 .btn:active{transform: translateY(1px)}
-.btn.primary{ background: #111827; color: #fff; border-color: #111827; }
-.btn.success{ background: #16a34a; color:#fff; border-color:#16a34a; }
+.btn.primary{ background:#111827; color:#fff; border-color:#111827; }
+.btn.success{ background:#16a34a; color:#fff; border-color:#16a34a; }
 
 .main{ display:grid; gap:12px; grid-template-columns: 1fr; margin-top: 10px; }
 @media (min-width: 900px){
@@ -94,6 +100,7 @@ select{
 .meta{ color:var(--muted); font-size:12px; }
 .score{ color:var(--muted); font-size:12px; }
 .score strong{ color:var(--ink); font-size:14px; }
+.dot{ padding: 0 6px; }
 
 .sentenceBar{
   min-height: 58px; border-radius:16px; border:1px dashed var(--border);
@@ -111,26 +118,36 @@ select{
 .feedback.ok{ background:#ecfdf5; border-color:#bbf7d0; }
 .feedback.bad{ background:#fff1f2; border-color:#fecdd3; }
 
-.tileGrid{
-  display:grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap:10px;
-}
-@media (min-width: 520px){ .tileGrid{ grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (min-width: 900px){ .tileGrid{ grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-
-.tile{
-  user-select:none;
+.boardWrap{ width:100%; overflow:auto; padding: 6px 2px 10px; }
+.board{
+  position:relative;
+  min-height: 240px;
   border-radius:16px;
-  padding: 12px 10px;
+  border:1px solid var(--border);
+  background: linear-gradient(180deg, #ffffff, #fafafa);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.02);
+  margin: 0 auto;
+}
+
+.boardHint{ color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+/* Mahjong tile */
+.tile{
+  position:absolute;
+  width: var(--tw);
+  height: var(--th);
+
+  border-radius:16px;
+  padding: 10px 10px;
   border:1px solid var(--border);
   box-shadow: var(--shadow);
-  cursor:pointer;
-  opacity: 1; /* solid tiles */
+
   background: var(--other);
   display:flex; flex-direction:column; gap:6px;
-  min-height: 64px; justify-content:center;
+  justify-content:center;
+  user-select:none;
 }
+
 .tile .word{ font-weight:900; font-size:16px; line-height:1.05; }
 .tile .pos{ font-size:11px; font-weight:750; color: rgba(0,0,0,.55); }
 
@@ -140,8 +157,15 @@ select{
 .tile[data-pos="noun"]{ background: var(--noun); }
 .tile[data-pos="prep"]{ background: var(--prep); }
 
-.tile:hover{ outline: 2px solid rgba(17,24,39,.15); }
-.tile:active{ transform: translateY(1px); }
+.tile.playable{ cursor:pointer; }
+.tile.playable:hover{ outline: 2px solid rgba(17,24,39,.15); }
+.tile.playable:active{ transform: translateY(1px); }
+
+.tile.blocked{
+  opacity: .32;
+  filter: grayscale(.35);
+  cursor: not-allowed;
+}
 
 .footer{
   margin-top: 12px; padding: 10px 6px;
