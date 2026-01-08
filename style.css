@@ -18,8 +18,14 @@
   --tw: clamp(62px, 9.5vw, 78px);
   --th: clamp(58px, 8.5vw, 70px);
   --gap: 10px;
+
+  /* layer offsets (stacking) */
   --zdx: 7px;
   --zdy: 6px;
+
+  /* 3D depth */
+  --depthX: 7px;
+  --depthY: 7px;
 }
 
 *{box-sizing:border-box}
@@ -131,38 +137,75 @@ select{
 
 .boardHint{ color: var(--muted); font-size: 12px; margin-top: 8px; }
 
-/* Mahjong tile */
+/* Mahjong tile with 3D feel */
 .tile{
   position:absolute;
   width: var(--tw);
   height: var(--th);
-
   border-radius:16px;
-  padding: 10px 10px;
-  border:1px solid var(--border);
-  box-shadow: var(--shadow);
 
+  /* “top face” */
+  padding: 10px 10px;
+  border:1px solid rgba(0,0,0,.10);
+
+  /* 3D top shading */
   background: var(--other);
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0) 40%),
+    linear-gradient(0deg, rgba(0,0,0,.06), rgba(0,0,0,0) 45%);
+
+  /* 3D thickness shadows */
+  box-shadow:
+    0 10px 22px rgba(0,0,0,.10),
+    var(--depthX) var(--depthY) 0 rgba(0,0,0,.06),
+    calc(var(--depthX) * 2) calc(var(--depthY) * 2) 0 rgba(0,0,0,.03);
+
   display:flex; flex-direction:column; gap:6px;
   justify-content:center;
   user-select:none;
 }
 
+/* Bevel highlight + subtle inset */
+.tile::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:16px;
+  pointer-events:none;
+  box-shadow:
+    inset 2px 2px 0 rgba(255,255,255,.7),
+    inset -3px -3px 0 rgba(0,0,0,.08);
+}
+
+/* Side “lip” to hint at depth */
+.tile::after{
+  content:"";
+  position:absolute;
+  left: 6px;
+  right: 6px;
+  bottom: -6px;
+  height: 10px;
+  border-radius: 0 0 14px 14px;
+  pointer-events:none;
+  background: rgba(0,0,0,.06);
+  filter: blur(.2px);
+}
+
 .tile .word{ font-weight:900; font-size:16px; line-height:1.05; }
 .tile .pos{ font-size:11px; font-weight:750; color: rgba(0,0,0,.55); }
 
-.tile[data-pos="pronoun"]{ background: var(--pron); }
-.tile[data-pos="verb"]{ background: var(--verb); }
-.tile[data-pos="det"]{ background: var(--det); }
-.tile[data-pos="noun"]{ background: var(--noun); }
-.tile[data-pos="prep"]{ background: var(--prep); }
+.tile[data-pos="pronoun"]{ background-color: var(--pron); }
+.tile[data-pos="verb"]{ background-color: var(--verb); }
+.tile[data-pos="det"]{ background-color: var(--det); }
+.tile[data-pos="noun"]{ background-color: var(--noun); }
+.tile[data-pos="prep"]{ background-color: var(--prep); }
 
 .tile.playable{ cursor:pointer; }
-.tile.playable:hover{ outline: 2px solid rgba(17,24,39,.15); }
+.tile.playable:hover{ outline: 2px solid rgba(17,24,39,.16); }
 .tile.playable:active{ transform: translateY(1px); }
 
 .tile.blocked{
-  opacity: .32;
+  opacity: .30;
   filter: grayscale(.35);
   cursor: not-allowed;
 }
