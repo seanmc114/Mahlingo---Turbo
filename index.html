@@ -13,7 +13,7 @@
         <div class="logo">🀄</div>
         <div>
           <h1>Mahlingo Tiles</h1>
-          <p class="sub">Build correct sentences by tapping tiles</p>
+          <p class="sub">Clear the board by building correct sentences from playable tiles</p>
         </div>
       </div>
 
@@ -36,7 +36,7 @@
           </select>
         </label>
 
-        <button id="startBtn" class="btn primary">Start / Reset</button>
+        <button id="startBtn" class="btn primary">New Board</button>
       </div>
     </header>
 
@@ -45,12 +45,15 @@
         <h2>Prompt</h2>
         <div class="promptRow">
           <div class="pill" id="promptLabel">Goal</div>
-          <div id="promptText" class="promptText">Press Start</div>
+          <div id="promptText" class="promptText">Press New Board</div>
         </div>
+
         <div class="metaRow">
           <div class="meta" id="ruleHint"></div>
           <div class="score">
             <span>Score:</span> <strong id="score">0</strong>
+            <span class="dot">•</span>
+            <span>Tiles left:</span> <strong id="tilesLeft">0</strong>
           </div>
         </div>
       </section>
@@ -62,7 +65,7 @@
         <div class="actions">
           <button id="undoBtn" class="btn">Undo</button>
           <button id="clearBtn" class="btn">Clear</button>
-          <button id="shuffleBtn" class="btn">Shuffle tiles</button>
+          <button id="shuffleBtn" class="btn">Shuffle layout</button>
           <button id="checkBtn" class="btn success">Check</button>
         </div>
 
@@ -70,8 +73,13 @@
       </section>
 
       <section class="panel tiles">
-        <h2>Tiles</h2>
-        <div id="tileGrid" class="tileGrid" aria-label="tiles"></div>
+        <h2>Mahjong board</h2>
+        <div class="boardWrap">
+          <div id="board" class="board" aria-label="board"></div>
+        </div>
+        <div class="boardHint">
+          A tile is playable if nothing is on top of it and at least one side (left/right) is free.
+        </div>
       </section>
     </main>
 
@@ -84,7 +92,7 @@
         <span class="key k-prep">Prep</span>
         <span class="key k-other">Other</span>
       </div>
-      <div class="tiny">Tip: Spanish can drop the subject (“voy…”). English & German usually can’t.</div>
+      <div class="tiny">Spanish can drop the subject (“voy…”). English & German typically require it.</div>
     </footer>
   </div>
 
