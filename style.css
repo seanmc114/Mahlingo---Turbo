@@ -78,7 +78,7 @@ h1{
   padding: 16px 18px 18px;
 }
 
-/* Mobile: board first, bigger play area */
+/* Mobile: board first */
 @media (max-width: 980px){
   .layout{ grid-template-columns: 1fr; }
   .right{ grid-row: 1; }
@@ -112,6 +112,7 @@ h1{
   font-size: 13px;
   color: var(--text);
 }
+
 .rules{
   margin-top: 12px;
   border-top: 1px solid var(--line);
@@ -172,7 +173,7 @@ h1{
   align-items:stretch;
   overflow:hidden;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.22);
   box-shadow: 0 4px 10px rgba(0,0,0,0.18);
 }
 .tokenMain{
@@ -185,26 +186,26 @@ h1{
   font-weight: 900;
   font-size: 13px;
   letter-spacing: 0.2px;
-  color: rgba(0,0,0,0.88); /* dark text on solid pastel tokens */
+  color: rgba(0,0,0,0.90);
 }
 .tokenBtns{
   display:flex;
   flex-direction: column;
-  border-left: 1px solid rgba(255,255,255,0.18);
+  border-left: 1px solid rgba(255,255,255,0.22);
 }
 .tbtn{
   width: 30px;
   display:grid;
   place-items:center;
   cursor:pointer;
-  background: rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.24);
   border:0;
   color: rgba(0,0,0,0.82);
   font-weight: 900;
 }
-.tbtn:hover{ background: rgba(255,255,255,0.28); }
-.tbtn:active{ background: rgba(255,255,255,0.22); }
-.tbtn + .tbtn{ border-top: 1px solid rgba(255,255,255,0.18); }
+.tbtn:hover{ background: rgba(255,255,255,0.30); }
+.tbtn:active{ background: rgba(255,255,255,0.26); }
+.tbtn + .tbtn{ border-top: 1px solid rgba(255,255,255,0.22); }
 
 .status{
   padding: 10px;
@@ -240,40 +241,39 @@ h1{
   align-items:center;
   margin-bottom: 10px;
 }
-.boardHeader h2{
-  margin:0;
-  font-size: 15px;
-}
+.boardHeader h2{ margin:0; font-size: 15px; }
 .legend{
   display:flex;
   flex-wrap: wrap;
   gap: 6px;
   justify-content:flex-end;
 }
+
 .pill{
   padding: 5px 9px;
   border-radius: 999px;
   font-size: 11px;
   border: 1px solid rgba(255,255,255,0.18);
-  color: rgba(0,0,0,0.86);
+  color: rgba(0,0,0,0.88);
   font-weight: 900;
   letter-spacing: 0.2px;
 }
 
+/* Bigger play area + darker board so tiles pop */
 .board{
   position: relative;
   width: 100%;
-  height: clamp(640px, 76vh, 980px);
+  height: clamp(660px, 78vh, 1020px);
   margin: 0 auto;
   border-radius: 18px;
-  background: rgba(0,0,0,0.24);
+  background: rgba(0,0,0,0.38);
   border: 1px solid rgba(255,255,255,0.12);
   overflow: hidden;
 }
 
 /* Slightly bigger board on phones */
 @media (max-width: 980px){
-  .board{ height: 74vh; }
+  .board{ height: 76vh; }
 }
 
 /* Small phones: slightly smaller tiles so more fits on screen */
@@ -291,7 +291,7 @@ h1{
   width: var(--tileW);
   height: var(--tileH);
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.26);
+  border: 2px solid rgba(255,255,255,0.30);
   box-shadow: var(--shadow);
   cursor: pointer;
   user-select:none;
@@ -301,33 +301,42 @@ h1{
   padding: 8px 10px;
   transform: translateZ(0);
   transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+  /* subtle “tile face” highlight without translucency */
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(255,255,255,0.00));
+  background-blend-mode: overlay;
 }
+
 .tile:hover{
   transform: translateY(-2px);
-  filter: brightness(1.04);
+  filter: brightness(1.03);
 }
+
 .tile .word{
   font-weight: 1000;
   letter-spacing: 0.2px;
   font-size: 14px;
   line-height: 1.05;
-  color: rgba(0,0,0,0.88); /* dark text on solid pastel tiles */
+  color: rgba(0,0,0,0.90);
+  text-shadow: none;
 }
 
-/* Hide POS text everywhere (tiles + tray) */
+/* Hide POS text (colour does the job) */
 .tile .pos,
 .tokenPos{
   display:none !important;
 }
 
 .tile.free{
-  outline: 3px solid rgba(255,255,255,0.22);
+  outline: 3px solid rgba(255,255,255,0.28);
 }
+
+/* IMPORTANT: blocked tiles are NOT transparent anymore */
 .tile.blocked{
-  opacity: 0.65;
-  filter: saturate(0.85);
+  opacity: 0.92; /* key fix */
+  filter: saturate(0.85) brightness(0.92);
   cursor: not-allowed;
 }
+
 .tile.selected{
   outline: 3px solid rgba(33,150,243,0.92);
   transform: translateY(-3px) scale(1.02);
@@ -353,13 +362,13 @@ h1{
   font-size: 12px;
 }
 
-/* POS coloring (solid pastel; fixes "see-through" distraction) */
-.det{  background: rgba(255,193,7,0.86);  border-color: rgba(255,193,7,0.95); }
-.noun{ background: rgba(76,175,80,0.82);  border-color: rgba(76,175,80,0.92); }
-.verb{ background: rgba(33,150,243,0.84); border-color: rgba(33,150,243,0.94); }
-.adj{  background: rgba(156,39,176,0.78); border-color: rgba(156,39,176,0.92); }
-.pron{ background: rgba(244,67,54,0.76);  border-color: rgba(244,67,54,0.90); }
-.prep{ background: rgba(0,188,212,0.80);  border-color: rgba(0,188,212,0.92); }
+/* FULLY OPAQUE POS COLOURS (no alpha) */
+.det{  background:#F7C948; border-color:#E6B800; }
+.noun{ background:#62D26F; border-color:#3DBD52; }
+.verb{ background:#4FA8FF; border-color:#2B8FFF; }
+.adj{  background:#B57BFF; border-color:#9B57FF; }
+.pron{ background:#FF6B6B; border-color:#FF4A4A; }
+.prep{ background:#4FE3E8; border-color:#18CDD4; }
 
 /* Tray shake for invalid submissions */
 .shake{
